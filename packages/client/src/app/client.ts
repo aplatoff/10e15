@@ -4,7 +4,7 @@ import {
   type Client,
   type ErrorCode,
   type Method,
-  Protocol,
+  protocol,
   type RpcError,
   type RpcRequest,
   type RpcResponse,
@@ -45,4 +45,4 @@ const postRequest = async <P extends any[], R>(req: RpcRequest<P, R>): Promise<R
 let lastId = 0
 
 export const request = <P extends any[], R>(method: Method<P, R>, ...params: P): Promise<R> =>
-  postRequest({ protocol: Protocol, id: ++lastId, method, params })
+  postRequest({ protocol, id: ++lastId, method: method.code, params })

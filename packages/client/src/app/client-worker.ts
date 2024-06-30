@@ -1,6 +1,6 @@
 //
 
-import { Protocol, RpcException, type RpcRequest, type RpcResponse } from 'proto'
+import { protocol, RpcException, type RpcRequest, type RpcResponse } from 'proto'
 import { type Client } from './types'
 
 if ('serviceWorker' in navigator) {
@@ -25,7 +25,7 @@ export const createTransport = (): Client => ({
     navigator.serviceWorker.addEventListener('message', (event) => {
       console.log('Received message from service worker:', event.data)
       const response = event.data as RpcResponse
-      if (response.protocol === Protocol) listener(response)
+      if (response.protocol === protocol) listener(response)
     })
   },
 })

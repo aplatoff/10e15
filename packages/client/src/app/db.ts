@@ -1,7 +1,7 @@
 //
 
 import { LRUCache } from 'lru-cache'
-import { type CheckboxNo, type PageNo, PageSizeBits } from 'model'
+import { type CheckboxNo, checkboxToPage, type PageNo, PageSizeBits } from 'model'
 import { subscribe } from 'proto'
 import { request } from './client'
 
@@ -27,17 +27,18 @@ function createPage(pageNo: PageNo): Page {
 
   const page: Page = {
     getCheckbox(no: CheckboxNo): number {
-      const [verify, offset] = split(no, PageSizeBits + 3)
+      const [verify, offset] = checkboxToPage(no)
       if (verify !== pageNo) throw new Error(`Invalid checkbox number ${no} for page ${pageNo}`)
       return (data[offset >> 3] >> (no & 7)) & 1
     },
     toggleCheckbox(no: CheckboxNo) {
-      const [verify, offset] = split(no, PageSizeBits + 3)
+      const [verify, offset] = checkboxToPage(no)
       if (verify !== pageNo) throw new Error(`Invalid checkbox number ${no} for page ${pageNo}`)
       data[offset >> 3] ^= 1 << (no & 7)
     },
     contains(no: CheckboxNo): boolean {
-      return no >> (PageSizeBits + 3) === pageNo
+      const [verify, _] = checkboxToPage(no)
+      return verify === pageNo
     },
   }
 
@@ -57,11 +58,15 @@ export function createDb(): Db {
 
   return {
     getPage(no: CheckboxNo): Page {
-      const pageNo = (no >>> (PageSizeBits + 3)) as PageNo
+      console.log('getPage', no)
+
+      const [pageNo, _] = checkboxToPage(no)
+      console.log('pageNo', pageNo)
 
       const page = pageCache.get(pageNo)
       if (page !== undefined) return page
 
+      console.log('not cached, requesting', pageNo)
       const newPage = createPage(pageNo)
       pageCache.set(pageNo, newPage)
 

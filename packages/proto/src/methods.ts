@@ -1,22 +1,14 @@
 //
 
-import type { PageNo } from 'model'
+import type { CheckboxNo, PageNo } from 'model'
 import type { Method } from './types'
 
-type MethodMetadata = {
-  method: Method<any, any>
-  code: number
-  payloadSize: number
-}
+// type MethodInfo<P extends any[], R> = {
+//   method: Method<P, R>
+//   payloadSize: number
+// }
 
-const subscribeCode = 0x01
+export const toggle = { code: 0x00, size: 0x08 } as Method<[CheckboxNo], void>
+export const subscribe = { code: 0x01, size: 0x04 } as Method<[PageNo], void>
 
-export const subscribe = 'subscribe' as Method<[PageNo], any>
-
-export const metadata: Record<string, MethodMetadata> = {
-  subscribe: {
-    method: subscribe,
-    code: subscribeCode,
-    payloadSize: 4,
-  },
-}
+export const methods = [toggle, subscribe]

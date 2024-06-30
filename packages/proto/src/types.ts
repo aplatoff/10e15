@@ -1,9 +1,16 @@
 //
 
-export type Method<P extends any[] = any, R = any> = string & { __params: P; __result: R }
+export const HeaderSize = 4
+
+export type MethodId<P extends any[] = any, R = any> = number & { __params: P; __result: R }
+
+export type Method<P extends any[] = any, R = any> = {
+  code: MethodId<P, R>
+  size: number
+}
 
 export interface MethodCall<P extends any[], R> {
-  method: Method<P, R>
+  method: MethodId<P, R>
   params: P
 }
 
@@ -14,19 +21,18 @@ export interface ErrorCode {
 
 export interface RpcMessage {
   protocol: string
+  id: number
 }
 
-export interface RpcRequest<P extends any[] = any[], R = any> extends MethodCall<P, R>, RpcMessage {
-  id?: number
-}
+export interface RpcRequest<P extends any[] = any[], R = any>
+  extends MethodCall<P, R>,
+    RpcMessage {}
 
 export interface RpcResult<T = any> extends RpcMessage {
-  id: number
   result: T
 }
 
 export interface RpcError extends RpcMessage {
-  id: number
   error: ErrorCode
 }
 

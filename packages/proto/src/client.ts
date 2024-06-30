@@ -1,10 +1,12 @@
 //
 
-import { type PageNo } from 'model'
-import { metadata } from './methods'
+import { RpcException } from '.'
+import { encoders, writeHeader } from './encoders'
+import { methods } from './methods'
 import type { RpcRequest } from './types'
+import { HeaderSize } from './types'
 
-const ws = new WebSocket('ws://localhost:8080')
+const ws = new WebSocket('ws://localhost:3000/proto')
 
 ws.onopen = processQueue
 ws.onclose = () => {
@@ -31,30 +33,17 @@ function postRequest(buffer: ArrayBuffer) {
   processQueue()
 }
 
-function subscribeEncoder(view: DataView, pageNo: PageNo) {
-  view.setUint32(0, pageNo)
-}
-
-const encoders: Record<string, (...params: any[]) => void> = {
-  subscribe: subscribeEncoder,
-}
-
-const headerSize = 4
-
-function writeHeader(view: DataView, code: number, id: number | undefined) {
-  if (id !== undefined) view.setUint32(0, id)
-  view.setUint8(0, code)
-}
-
 export const createClient = () => ({
   postRequest(request: RpcRequest) {
-    const meta = metadata[request.method]
-    const bufferSize = headerSize + meta.payloadSize
-    const buffer = new ArrayBuffer(bufferSize)
-    writeHeader(new DataView(buffer, 0, headerSize), meta.code, request.id)
+    const method = methods[request.method]
+    if (method === undefined) throw new RpcException(3, `method not found: ${request.method}`)
 
-    const encoder = encoders[request.method]
-    encoder(new DataView(buffer, headerSize), ...request.params)
+    const bufferSize = HeaderSize + method.size
+    const encoder = encoders[method.code]
+
+    const buffer = new ArrayBuffer(bufferSize)
+    writeHeader(new DataView(buffer, 0, HeaderSize), method.code, request.id)
+    encoder(new DataView(buffer, HeaderSize), ...request.params)
 
     postRequest(buffer)
   },
