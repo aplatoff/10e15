@@ -1,6 +1,6 @@
 //
 
-import type { PageNo } from 'model'
+import type { Checkbox, PageNo } from 'model'
 
 type Config = {
   drives: number
@@ -9,7 +9,7 @@ type Config = {
 }
 
 const production = {
-  drives: 16,
+  driveBits: 4,
   paths: [
     '/mnt/disk0',
     '/mnt/disk1',
@@ -30,12 +30,51 @@ const production = {
   memory: 64 * 1024, // MB
 }
 
+enum PageState {
+  Empty,
+}
+
+type Page = {
+  state: PageState
+}
+
 export interface Db {
-  toggle(pageNo: PageNo, offset: number): void
+  toggle(checkbox: Checkbox): Promise<void>
+}
+
+const name = (value: number, pad: number) => value.toString(16).padStart(pad, '0')
+
+async function createPage(pageNo: PageNo): Promise<Page> {
+  const drive = pageNo & ((1 << production.driveBits) - 1)
+  const fileNo = pageNo >>> production.driveBits
+  const root = fileNo & 0xff
+  const subfolder = (root >>> 8) & 0xff
+  const file = fileNo >>> 16
+
+  const path = `${production.paths[drive]}/${name(root, 2)}/${name(subfolder, 2)}/${name(file, 2)}`
+  console.log('path', pageNo, path)
+
+  const meta = Bun.file(`${path}.meta`)
+  const exists = await meta.exists()
+  if (!exists) {
+    return {
+      state: PageState.Empty,
+    }
+  }
+
+  throw new Error('Not implemented')
 }
 
 export function createDb(config: Config): Db {
-  return {
+  const pages = new Map<PageNo, Page>()
 
+  return {
+    async toggle(checkbox: Checkbox): Promise<void> {
+      let page = pages.get(checkbox.page)
+      if (page === undefined) {
+        page = await createPage(checkbox.page)
+        pages.set(checkbox.page, page)
+      }
+    },
   }
 }

@@ -1,7 +1,8 @@
 //
 
-import { TotalCheckboxes, type CheckboxNo } from 'model'
-import { type Db, type Page } from './db'
+import { extractNo, TotalCheckboxes, type CheckboxNo, type PageNo } from 'model'
+import { type BitStorage } from 'proto'
+import { type Db } from './db'
 
 const numberFormat = new Intl.NumberFormat(navigator.language)
 const dpr = window.devicePixelRatio || 1
@@ -95,9 +96,14 @@ export function setupUI(
 
     let offsetPixels = 0 // vertical offset in pixels for smooth scrolling
 
-    let page: Page | null = null
-    function getPage(no: CheckboxNo): Page {
-      if (page === null || !page.contains(no)) page = db.getPage(no)
+    let pageNo = 0 as PageNo
+    let page = db.getPage(pageNo)
+
+    function getPage(no: PageNo): BitStorage {
+      if (no !== pageNo) {
+        pageNo = no
+        page = db.getPage(no)
+      }
       return page
     }
 
@@ -152,13 +158,14 @@ export function setupUI(
             const checkboxNo = (rowStart + c) as CheckboxNo
             if (checkboxNo >= TotalCheckboxes) break
 
-            const page = getPage(checkboxNo)
+            const checkbox = extractNo(checkboxNo)
+            const page = getPage(checkbox.page)
             checkboxFunction(
               ctx,
               leftOffset + c * cellSize,
               r * cellSize,
               cellSize,
-              page.getCheckbox(checkboxNo) !== 0
+              page.get(checkbox.offset) !== 0
             )
           }
         })
@@ -192,8 +199,10 @@ export function setupUI(
         if (cx < cols && cx >= 0) {
           const firstRow = Math.floor(firstCheckbox / cols)
           const no = ((firstRow + cy) * cols + cx) as CheckboxNo
-          const page = getPage(no)
-          page.toggleCheckbox(no)
+          const checkbox = extractNo(no)
+          console.log('toggle', checkbox.page, checkbox.offset)
+          const page = getPage(checkbox.page)
+          page.toggle(checkbox.offset)
         }
       },
     }
