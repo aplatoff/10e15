@@ -3,13 +3,12 @@
 import { encoders, writeHeader } from './encoders'
 import { RpcException } from './errors'
 import { methods } from './methods'
-import type { RpcRequest, RpcResponse } from './types'
-import { ErrorTag, HeaderSize, ResultTag } from './types'
+import type { RpcRequest } from './types'
+import { HeaderSize } from './types'
 
-export const createClient = (url: string, requestDecoder: (buf: ArrayBuffer) => RpcRequest) => {
+export const createClient = (url: string) => {
   const queue: ArrayBuffer[] = []
-  const responseListeners: ((response: RpcResponse) => void)[] = []
-  const broadcastListeners: ((request: RpcRequest) => void)[] = []
+  const listeners: ((buf: ArrayBuffer) => void)[] = []
 
   const ws = new WebSocket(url)
   ws.onopen = processQueue
@@ -23,18 +22,7 @@ export const createClient = (url: string, requestDecoder: (buf: ArrayBuffer) => 
     const blob = event.data as Blob
     console.log('Received ws message:', blob)
     blob.arrayBuffer().then((buffer) => {
-      const view = new DataView(buffer)
-      const code = view.getUint8(0)
-      switch (code) {
-        case ErrorTag:
-          break
-        case ResultTag:
-          break
-        default:
-          const request = requestDecoder(buffer)
-          broadcastListeners.forEach((listener) => listener(request))
-          break
-      }
+      listeners.forEach((listener) => listener(buffer))
     })
   }
 
@@ -67,11 +55,8 @@ export const createClient = (url: string, requestDecoder: (buf: ArrayBuffer) => 
 
       postRequest(buffer)
     },
-    addResponseListener(listener: (response: RpcResponse) => void) {
-      responseListeners.push(listener)
-    },
-    addBroadcastListener(listener: (request: RpcRequest) => void) {
-      broadcastListeners.push(listener)
+    addListener(listener: (buf: ArrayBuffer) => void) {
+      listeners.push(listener)
     },
   }
 }

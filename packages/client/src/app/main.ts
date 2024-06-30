@@ -4,12 +4,12 @@ import { Checkbox } from 'model'
 import {
   createClient,
   type ErrorCode,
+  ErrorTag,
   type Method,
+  parseHeader,
   protocol,
-  type RpcError,
+  ResultTag,
   type RpcRequest,
-  type RpcResponse,
-  type RpcResult,
   toErrorCode,
   toggle,
 } from 'proto'
@@ -20,28 +20,35 @@ import { setupUI } from './ui'
 type Callbacks = [(value: any) => void, (error: ErrorCode) => void]
 const requests = new Map<number, Callbacks>()
 
-const transport = createClient('ws://localhost:3000/proto', decodeRequest)
+const transport = createClient('ws://localhost:3000/proto')
 
-transport.addResponseListener((response: RpcResponse) => {
-  console.log('Received reponse from service worker:', response)
-  const callbacks = requests.get(response.id)
-  if (callbacks) {
-    const [resolve, reject] = callbacks
-    requests.delete(response.id)
-    if ('error' in response) {
-      reject((response as RpcError).error)
-      ui.scheduleDraw()
-    } else resolve((response as RpcResult).result)
-  } else console.error('No request found for response:', response)
-})
+transport.addListener((buffer: ArrayBuffer) => {
+  console.log('Received reponse from service worker:', buffer)
 
-transport.addBroadcastListener((request: RpcRequest) => {
-  console.log('Received broadcast from service worker:', request)
-  if (request.method === toggle.code) {
-    // TODO type handling
-    const checkbox = request.params[0] as Checkbox
-    db.getPage(checkbox.page).toggle(checkbox.offset)
-    ui.scheduleDraw()
+  const view = new DataView(buffer)
+  const { tag, id } = parseHeader(view.getUint32(0))
+  switch (tag) {
+    case ErrorTag:
+    case ResultTag:
+      const callbacks = requests.get(id)
+      if (callbacks) {
+        const [resolve, reject] = callbacks
+        requests.delete(id)
+        if (tag === ErrorTag) {
+          reject({ code: 0, message: 'Unknown error' })
+          ui.scheduleDraw()
+        } else resolve(void 0)
+      } else console.error('No request found for response:', id)
+      break
+    default:
+      const request = decodeRequest(buffer)
+      if (request.method === toggle.code) {
+        // TODO type handling
+        const checkbox = request.params[0] as Checkbox
+        db.getPage(checkbox.page).toggle(checkbox.offset)
+        ui.scheduleDraw()
+      }
+      break
   }
 })
 

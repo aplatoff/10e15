@@ -206,16 +206,10 @@ export function setupUI(
           const page = getPage(checkbox.page)
           page.toggle(checkbox.offset)
 
-          requestor
-            .request(toggle, { page: pageNo, offset: checkbox.offset })
-            .then((result) => {
-              console.log('toggled', pageNo, checkbox.offset, result)
-            })
-            .catch((error) => {
-              page.toggle(checkbox.offset) // revert
-              // TODO: redraw
-              console.error('error toggling', pageNo, checkbox.offset, error)
-            })
+          requestor.request(toggle, { page: pageNo, offset: checkbox.offset }).catch((error) => {
+            page.toggle(checkbox.offset) // revert
+            console.error('error toggling', pageNo, checkbox.offset, error)
+          })
         }
       },
     }
