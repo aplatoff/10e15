@@ -24,5 +24,5 @@ export function toErrorCode(error: unknown): ErrorCode {
 
 export { createClient } from './client'
 export { decoders } from './decoders'
-export { methods, subscribe } from './methods'
+export { methods, subscribe, toggle } from './methods'
 export * from './types'

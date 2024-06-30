@@ -19,13 +19,13 @@ export const checkboxToPage = (checkboxNo: CheckboxNo): [PageNo, number] => [
   checkboxNo & (checkboxesPerPage - 1),
 ]
 
-console.log(checkboxToPage(0 as CheckboxNo))
-console.log(checkboxToPage(100000 as CheckboxNo))
-console.log(checkboxToPage(1000000 as CheckboxNo))
-console.log(checkboxToPage(10000000 as CheckboxNo))
-console.log(checkboxToPage(100000000 as CheckboxNo))
-console.log(checkboxToPage(1000000000 as CheckboxNo))
-console.log(checkboxToPage(10000000000 as CheckboxNo))
-console.log(checkboxToPage(100000000000 as CheckboxNo))
-console.log(checkboxToPage(1000000000000 as CheckboxNo))
-console.log(checkboxToPage(10000000000000 as CheckboxNo))
+// console.log(checkboxToPage(0 as CheckboxNo))
+// console.log(checkboxToPage(100000 as CheckboxNo))
+// console.log(checkboxToPage(1000000 as CheckboxNo))
+// console.log(checkboxToPage(10000000 as CheckboxNo))
+// console.log(checkboxToPage(100000000 as CheckboxNo))
+// console.log(checkboxToPage(1000000000 as CheckboxNo))
+// console.log(checkboxToPage(10000000000 as CheckboxNo))
+// console.log(checkboxToPage(100000000000 as CheckboxNo))
+// console.log(checkboxToPage(1000000000000 as CheckboxNo))
+// console.log(checkboxToPage(10000000000000 as CheckboxNo))

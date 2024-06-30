@@ -2,7 +2,7 @@
 
 import { LRUCache } from 'lru-cache'
 import { type CheckboxNo, checkboxToPage, type PageNo, PageSizeBits } from 'model'
-import { subscribe } from 'proto'
+import { subscribe, toggle } from 'proto'
 import { request } from './client'
 
 const MaxCachedPages = 128
@@ -17,11 +17,6 @@ export interface Page {
   contains(no: CheckboxNo): boolean
 }
 
-const split = (value: number, bits: number): [number, number] => [
-  value >>> bits,
-  value & ((1 << bits) - 1),
-]
-
 function createPage(pageNo: PageNo): Page {
   const data = new Uint8Array(1 << PageSizeBits)
 
@@ -35,6 +30,7 @@ function createPage(pageNo: PageNo): Page {
       const [verify, offset] = checkboxToPage(no)
       if (verify !== pageNo) throw new Error(`Invalid checkbox number ${no} for page ${pageNo}`)
       data[offset >> 3] ^= 1 << (no & 7)
+      request(toggle, no)
     },
     contains(no: CheckboxNo): boolean {
       const [verify, _] = checkboxToPage(no)
