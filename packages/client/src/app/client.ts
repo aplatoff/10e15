@@ -11,11 +11,12 @@ import {
   type RpcResult,
   toErrorCode,
 } from 'proto'
+import { decodeRequest } from './decode'
 
 //import { createTransport } from './client-worker'
 import { createClient } from 'proto'
 
-const transport: Client = createClient()
+const transport: Client = createClient('ws://localhost:3000/proto', decodeRequest)
 
 type Callbacks = [(value: any) => void, (error: ErrorCode) => void]
 
@@ -28,6 +29,10 @@ transport.addResponseListener((response: RpcResponse) => {
     if ('error' in response) reject((response as RpcError).error)
     else resolve((response as RpcResult).result)
   } else console.error('No request found for response:', response)
+})
+
+transport.addBroadcastListener((request: RpcRequest) => {
+  console.log('Received broadcast from service worker:', request)
 })
 
 const requests = new Map<number, Callbacks>()
