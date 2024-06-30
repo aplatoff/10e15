@@ -1,8 +1,7 @@
 //
 
-// import { RpcRequest, type RpcResponse } from 'proto'
+import { type Method } from 'proto'
 
-// export interface Client {
-//   postRequest(request: RpcRequest): void
-//   addResponseListener(listener: (res: RpcResponse) => void): void
-// }
+export interface Requestor {
+  request: <P extends any[], R>(method: Method<P, R>, ...params: P) => Promise<R>
+}

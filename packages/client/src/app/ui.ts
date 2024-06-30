@@ -1,8 +1,9 @@
 //
 
 import { extractNo, TotalCheckboxes, type CheckboxNo, type PageNo } from 'model'
-import { type BitStorage } from 'proto'
+import { toggle, type BitStorage } from 'proto'
 import { type Db } from './db'
+import { type Requestor } from './types'
 
 const numberFormat = new Intl.NumberFormat(navigator.language)
 const dpr = window.devicePixelRatio || 1
@@ -21,10 +22,12 @@ export interface UI {
   makeLarger(): boolean
   makeSmaller(): boolean
   goto(no: number): void
+  scheduleDraw(): void
 }
 
 export function setupUI(
   db: Db,
+  requestor: Requestor,
   wrapper: HTMLElement,
   canvas: HTMLCanvasElement,
   onRowChange?: (firstCheckbox: number) => void
@@ -200,9 +203,19 @@ export function setupUI(
           const firstRow = Math.floor(firstCheckbox / cols)
           const no = ((firstRow + cy) * cols + cx) as CheckboxNo
           const checkbox = extractNo(no)
-          console.log('toggle', checkbox.page, checkbox.offset)
           const page = getPage(checkbox.page)
           page.toggle(checkbox.offset)
+
+          requestor
+            .request(toggle, { page: pageNo, offset: checkbox.offset })
+            .then((result) => {
+              console.log('toggled', pageNo, checkbox.offset, result)
+            })
+            .catch((error) => {
+              page.toggle(checkbox.offset) // revert
+              // TODO: redraw
+              console.error('error toggling', pageNo, checkbox.offset, error)
+            })
         }
       },
     }
@@ -226,6 +239,7 @@ export function setupUI(
       presentation?.alignScroll()
       scheduleDraw()
     },
+    scheduleDraw,
   }
 }
 
