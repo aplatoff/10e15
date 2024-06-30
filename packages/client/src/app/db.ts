@@ -1,7 +1,7 @@
 //
 
 import { LRUCache } from 'lru-cache'
-import { type CheckboxNo, checkboxToPage, type PageNo, PageSizeBits } from 'model'
+import { type CheckboxNo, extractNo, type PageNo, PageSizeBits } from 'model'
 import { subscribe, toggle } from 'proto'
 import { request } from './client'
 
@@ -22,20 +22,19 @@ function createPage(pageNo: PageNo): Page {
 
   const page: Page = {
     getCheckbox(no: CheckboxNo): number {
-      const [verify, offset] = checkboxToPage(no)
-      if (verify !== pageNo) throw new Error(`Invalid checkbox number ${no} for page ${pageNo}`)
-      return (data[offset >> 3] >> (no & 7)) & 1
+      const checkbox = extractNo(no)
+      if (checkbox.page !== pageNo)
+        throw new Error(`Invalid checkbox number ${no} for page ${pageNo}`)
+      return (data[checkbox.offset >> 3] >> (no & 7)) & 1
     },
     toggleCheckbox(no: CheckboxNo) {
-      const [verify, offset] = checkboxToPage(no)
-      if (verify !== pageNo) throw new Error(`Invalid checkbox number ${no} for page ${pageNo}`)
-      data[offset >> 3] ^= 1 << (no & 7)
-      request(toggle, no)
+      const checkbox = extractNo(no)
+      if (checkbox.page !== pageNo)
+        throw new Error(`Invalid checkbox number ${no} for page ${pageNo}`)
+      data[checkbox.offset >> 3] ^= 1 << (no & 7)
+      request(toggle, checkbox)
     },
-    contains(no: CheckboxNo): boolean {
-      const [verify, _] = checkboxToPage(no)
-      return verify === pageNo
-    },
+    contains: (no: CheckboxNo): boolean => extractNo(no).page === pageNo,
   }
 
   request(subscribe, pageNo)
@@ -56,15 +55,15 @@ export function createDb(): Db {
     getPage(no: CheckboxNo): Page {
       console.log('getPage', no)
 
-      const [pageNo, _] = checkboxToPage(no)
-      console.log('pageNo', pageNo)
+      const { page } = extractNo(no)
+      console.log('pageNo', page)
 
-      const page = pageCache.get(pageNo)
-      if (page !== undefined) return page
+      const cached = pageCache.get(page)
+      if (cached !== undefined) return cached
 
-      console.log('not cached, requesting', pageNo)
-      const newPage = createPage(pageNo)
-      pageCache.set(pageNo, newPage)
+      console.log('not cached, requesting', page)
+      const newPage = createPage(page)
+      pageCache.set(page, newPage)
 
       return newPage
     },

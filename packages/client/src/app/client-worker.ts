@@ -1,7 +1,6 @@
 //
 
-import { protocol, RpcException, type RpcRequest, type RpcResponse } from 'proto'
-import { type Client } from './types'
+import { protocol, RpcException, type Client, type RpcRequest, type RpcResponse } from 'proto'
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function () {
