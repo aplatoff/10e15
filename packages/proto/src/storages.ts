@@ -31,7 +31,8 @@ export interface TxStorage extends Chunk {
 }
 
 export interface Page extends BitStorage {
-  serialize(): Uint16Array
+  serialize(buf: Uint16Array): void
+  optimize(): number // optimize for storage and return the number of bytes to save content
 }
 
 // For efficiency, I'm limiting ChunkLength to 64K checkboxes per chunk
@@ -141,37 +142,29 @@ export function createPage(): Page {
       return false
     },
     get: (offset: number): number => getChunk(offset >> 16).get(offset & 0xffff),
-    serialize: (): Uint16Array => {
-      let size = 2 // nChunks
+    serialize: (result: Uint16Array) => {
+      let offset = 1
       let nChunks = 0
+      for (let i = 0; i < ChunksPerPage; i++) {
+        if (chunks[i]) {
+          nChunks++
+          const chunk = chunks[i]!
+          result[offset++] = i | (chunk.kind === 'bitmap' ? 0 : 0x8000)
+          chunk.save(result.subarray(offset))
+          offset += chunk.bytes() >> 1
+        }
+      }
+      result[0] = nChunks
+      return result
+    },
+    optimize: (): number => {
+      let size = 2
       for (let i = 0; i < ChunksPerPage; i++)
         if (chunks[i]) {
           chunks[i] = chunks[i]!.optimize()
           size += 2 + chunks[i]!.bytes()
-          nChunks++
         }
-
-      console.log('page size', size)
-      const result = new Uint16Array(size)
-      result[0] = nChunks
-
-      let offset = 1
-      for (let i = 0; i < ChunksPerPage; i++) {
-        if (chunks[i]) {
-          const chunk = chunks[i]!
-          if (chunk.kind === 'bitmap') {
-            result[offset++] = i
-            chunk.save(result.subarray(offset))
-            offset += BitmapSize
-          } else {
-            const txes = chunk as TxStorage
-            result[offset++] = i | 0x80
-            txes.save(result.subarray(offset))
-            offset += txes.length() + 1
-          }
-        }
-      }
-      return result
+      return size
     },
   }
 }
