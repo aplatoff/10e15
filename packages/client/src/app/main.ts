@@ -23,8 +23,6 @@ const requests = new Map<number, Callbacks>()
 const transport = createClient('ws://localhost:3000/proto')
 
 transport.addListener((buffer: ArrayBuffer) => {
-  console.log('Received reponse from service worker:', buffer)
-
   const view = new DataView(buffer)
   const { tag, id } = parseHeader(view.getUint32(0))
   switch (tag) {
