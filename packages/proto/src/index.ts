@@ -1,9 +1,9 @@
 //
 
 export { createClient } from './client'
-export { encodeResponse } from './encoders'
+export { encodeResult } from './encoders'
 export * from './errors'
 export { methods, subscribe, toggle } from './methods'
-export { createPage, type BitStorage } from './storages'
+export { createPage, type BitStorage, type Page } from './storages'
 export * from './types'
 

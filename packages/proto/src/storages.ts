@@ -154,17 +154,17 @@ export function createPage(): Page {
           offset += chunk.bytes() >> 1
         }
       }
-      result[0] = nChunks
+      if (nChunks > 0) result[0] = nChunks
       return result
     },
     optimize: (): number => {
-      let size = 2
+      let size = 0
       for (let i = 0; i < ChunksPerPage; i++)
         if (chunks[i]) {
           chunks[i] = chunks[i]!.optimize()
           size += 2 + chunks[i]!.bytes()
         }
-      return size
+      return size > 0 ? size + 2 : 0
     },
   }
 }

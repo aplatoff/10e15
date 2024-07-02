@@ -1,14 +1,15 @@
 //
 
 import type { Checkbox, PageNo } from 'model'
+import { type Page, createPage } from 'proto'
 
 type Config = {
-  drives: number
+  driveBits: number
   paths: string[]
   memory: number
 }
 
-const production = {
+export const production: Config = {
   driveBits: 4,
   paths: [
     '/mnt/disk0',
@@ -34,47 +35,69 @@ enum PageState {
   Empty,
 }
 
-type Page = {
+type PageDescriptor = {
   state: PageState
+  transient: Page
 }
 
 export interface Db {
-  toggle(checkbox: Checkbox): Promise<void>
+  toggle(checkbox: Checkbox): Promise<void> // queue in the future
+  serialize(page: PageNo): Promise<ArrayBuffer | null>
 }
 
 const name = (value: number, pad: number) => value.toString(16).padStart(pad, '0')
 
-async function createPage(pageNo: PageNo): Promise<Page> {
-  const drive = pageNo & ((1 << production.driveBits) - 1)
-  const fileNo = pageNo >>> production.driveBits
-  const root = fileNo & 0xff
-  const subfolder = (root >>> 8) & 0xff
-  const file = fileNo >>> 16
+export function createDb(config: Config): Db {
+  const pages = new Map<PageNo, PageDescriptor>()
 
-  const path = `${production.paths[drive]}/${name(root, 2)}/${name(subfolder, 2)}/${name(file, 2)}`
-  console.log('path', pageNo, path)
+  async function createPageDescriptor(pageNo: PageNo): Promise<PageDescriptor> {
+    const drive = pageNo & ((1 << config.driveBits) - 1)
+    const fileNo = pageNo >>> config.driveBits
+    const root = fileNo & 0xff
+    const subfolder = (root >>> 8) & 0xff
+    const file = fileNo >>> 16
 
-  const meta = Bun.file(`${path}.meta`)
-  const exists = await meta.exists()
-  if (!exists) {
-    return {
-      state: PageState.Empty,
+    const path = `${config.paths[drive]}/${name(root, 2)}/${name(subfolder, 2)}/${name(file, 2)}`
+    console.log('path', pageNo, path)
+
+    const meta = Bun.file(`${path}.meta`)
+    const exists = await meta.exists()
+    if (!exists) {
+      return {
+        state: PageState.Empty,
+        transient: createPage(),
+      }
     }
+
+    throw new Error('Not implemented')
   }
 
-  throw new Error('Not implemented')
-}
-
-export function createDb(config: Config): Db {
-  const pages = new Map<PageNo, Page>()
+  async function getPage(page: PageNo): Promise<PageDescriptor> {
+    const desc = pages.get(page)
+    if (desc === undefined) {
+      const desc = await createPageDescriptor(page)
+      pages.set(page, desc)
+      return desc
+    }
+    return desc
+  }
 
   return {
     async toggle(checkbox: Checkbox): Promise<void> {
-      let page = pages.get(checkbox.page)
-      if (page === undefined) {
-        page = await createPage(checkbox.page)
-        pages.set(checkbox.page, page)
-      }
+      const page = await getPage(checkbox.page)
+      return page.transient.toggle(checkbox.offset)
+    },
+
+    async serialize(n: PageNo): Promise<ArrayBuffer | null> {
+      const desc = await getPage(n)
+      const page = desc.transient
+      const size = page.optimize()
+      console.log('serialize page', n, size)
+      if (size === 0) return null
+
+      const buf = new ArrayBuffer(size)
+      page.serialize(new Uint16Array(buf))
+      return buf
     },
   }
 }

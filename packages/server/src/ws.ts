@@ -1,6 +1,7 @@
 //
 
-import { encodeResponse, toggle } from 'proto'
+import { encodeResult, toggle } from 'proto'
+import { createDb, production } from './db'
 import { decodeRequest } from './decode'
 import { handlers } from './handlers'
 
@@ -12,6 +13,8 @@ const welcomeMessage =
 const broadcastTopic = 'everyone'
 
 export function createServer() {
+  const db = createDb(production)
+
   const server = Bun.serve<ClientData>({
     fetch(req, server) {
       const url = new URL(req.url)
@@ -35,8 +38,15 @@ export function createServer() {
           if (request.method === toggle.code) ws.publish(broadcastTopic, message)
 
           const handler = handlers[request.method]
-          const response = handler(request)
-          ws.send(encodeResponse(response))
+          handler(db, request)
+            .then((result) => {
+              const buf = encodeResult(request.id, result) as Blob
+              ws.
+              // ws.send(Buffer.from(buf))
+            })
+            .catch((error) => {
+              console.error(error)
+            })
         }
       },
       close(ws) {

@@ -1,22 +1,31 @@
 //
 
-import { type CheckboxNo, type PageNo } from 'model'
-import { type RpcRequest, type RpcResult, protocol } from 'proto'
+import { type Checkbox, type PageNo } from 'model'
+import { type RpcRequest } from 'proto'
+import { type Db } from './db'
 
-const voidResult = (request: RpcRequest): RpcResult => ({
-  protocol,
-  id: request.id,
-  result: undefined,
-})
+// const voidResult = (request: RpcRequest): RpcResult => ({
+//   protocol,
+//   id: request.id,
+//   result: undefined,
+// })
 
-function toggle(request: RpcRequest<[CheckboxNo], void>): RpcResult {
-  console.log('Toggling checkbox:', request.params[0])
-  return voidResult(request)
+// const writeHeader = (buf: Uint32Array, id: number, payloadSize: number) => {
+//   buf[0] = (id & 0x00ffffff) | (ResultTag << 24)
+//   buf[1] = payloadSize
+// }
+
+type HanderFunc = (db: Db, req: RpcRequest) => Promise<ArrayBuffer | null>
+
+async function toggle(db: Db, request: RpcRequest<[Checkbox], void>): Promise<ArrayBuffer | null> {
+  db.toggle(request.params[0])
+  // const result = new ArrayBuffer(8)
+  // writeHeader(new Uint32Array(result, 0, HeaderSize), request.id, 0)
+  // return result
+  return null
 }
 
-function subscribe(request: RpcRequest<[PageNo], void>): RpcResult {
-  console.log('Subscribe:', request.params[0])
-  return voidResult(request)
-}
+const subscribe = (db: Db, request: RpcRequest<[PageNo], void>): Promise<ArrayBuffer | null> =>
+  db.serialize(request.params[0])
 
-export const handlers = [toggle, subscribe] as ((req: RpcRequest) => RpcResult)[]
+export const handlers = [toggle, subscribe] as HanderFunc[]
