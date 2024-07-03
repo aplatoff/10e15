@@ -1,6 +1,6 @@
 //
 
-import type { Checkbox, PageNo } from 'model'
+import type { PageNo } from 'model'
 import { type Page, createPage } from 'proto'
 
 type Config = {
@@ -41,8 +41,8 @@ type PageDescriptor = {
 }
 
 export interface Db {
-  toggle(checkbox: Checkbox): Promise<void> // queue in the future
-  serialize(page: PageNo): Promise<ArrayBuffer | null>
+  toggle(page: PageNo, offset: number): Promise<void> // queue in the future
+  serialize(page: PageNo): Promise<ArrayBuffer>
 }
 
 const name = (value: number, pad: number) => value.toString(16).padStart(pad, '0')
@@ -83,17 +83,16 @@ export function createDb(config: Config): Db {
   }
 
   return {
-    async toggle(checkbox: Checkbox): Promise<void> {
-      const page = await getPage(checkbox.page)
-      return page.transient.toggle(checkbox.offset)
+    async toggle(pageNo: PageNo, offset: number): Promise<void> {
+      const page = await getPage(pageNo)
+      return page.transient.toggle(offset)
     },
 
-    async serialize(n: PageNo): Promise<ArrayBuffer | null> {
+    async serialize(n: PageNo): Promise<ArrayBuffer> {
       const desc = await getPage(n)
       const page = desc.transient
       const size = page.optimize()
-      console.log('serialize page', n, size)
-      if (size === 0) return null
+      console.log('serialize page no', n, 'to buffer size (bytes)', size)
 
       const buf = new ArrayBuffer(size)
       page.serialize(new Uint16Array(buf))

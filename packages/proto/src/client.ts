@@ -1,13 +1,7 @@
 //
 
-import { encoders, writeHeader } from './encoders'
-import { RpcException } from './errors'
-import { methods } from './methods'
-import type { RpcRequest } from './types'
-import { HeaderSize } from './types'
-
 export const createClient = (url: string) => {
-  const queue: ArrayBuffer[] = []
+  const queue: ArrayBufferLike[] = []
   const listeners: ((buf: ArrayBuffer) => void)[] = []
 
   const ws = new WebSocket(url)
@@ -36,24 +30,10 @@ export const createClient = (url: string) => {
     }
   }
 
-  function postRequest(buffer: ArrayBuffer) {
-    queue.push(buffer)
-    processQueue()
-  }
-
   return {
-    postRequest(request: RpcRequest) {
-      const method = methods[request.method]
-      if (method === undefined) throw new RpcException(3, `method not found: ${request.method}`)
-
-      const bufferSize = HeaderSize + method.size
-      const encoder = encoders[method.code]
-
-      const buffer = new ArrayBuffer(bufferSize)
-      writeHeader(new DataView(buffer, 0, HeaderSize), method.code, request.id)
-      encoder(new DataView(buffer, HeaderSize), ...request.params)
-
-      postRequest(buffer)
+    postRequest(buffer: ArrayBufferLike) {
+      queue.push(buffer)
+      processQueue()
     },
     addListener(listener: (buf: ArrayBuffer) => void) {
       listeners.push(listener)

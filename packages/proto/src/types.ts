@@ -15,15 +15,15 @@ export const parseHeader = (header: number) => ({
   id: header & 0x00ffffff,
 })
 
-export type MethodId<P extends any[] = any, R = any> = number & { __params: P; __result: R }
+export type MethodId<P extends any[] = any> = number & { __params: P }
 
-export type Method<P extends any[] = any, R = any> = {
-  code: MethodId<P, R>
+export type Method<P extends any[] = any> = {
+  code: MethodId<P>
   size: number
 }
 
-export interface MethodCall<P extends any[], R> {
-  method: MethodId<P, R>
+export interface MethodCall<P extends any[]> {
+  method: MethodId<P>
   params: P
 }
 
@@ -37,9 +37,7 @@ export interface RpcMessage {
   id: number
 }
 
-export interface RpcRequest<P extends any[] = any[], R = any>
-  extends MethodCall<P, R>,
-    RpcMessage {}
+export interface RpcRequest<P extends any[] = any[]> extends MethodCall<P>, RpcMessage {}
 
 export interface RpcResult<T = any> extends RpcMessage {
   result: T

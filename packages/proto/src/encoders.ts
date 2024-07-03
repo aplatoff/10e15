@@ -22,10 +22,13 @@ export const encoders: ((view: DataView, ...params: any[]) => void)[] = [
   subscribeEncoder,
 ]
 
-export function encodeResult(id: number, result: ArrayBuffer | null): Blob | ArrayBuffer {
-  const buf = new ArrayBuffer(4)
-  const view = new DataView(buf)
-  view.setUint32(0, id)
-  view.setUint8(0, ResultTag)
-  return result ? new Blob([buf, result]) : buf
+export function encodeResult(id: number, result: ArrayBuffer): ArrayBuffer {
+  const buf = new ArrayBuffer(4 + result.byteLength)
+  const uint8 = new Uint8Array(buf)
+  uint8[0] = ResultTag
+  uint8[1] = id >> 16
+  uint8[2] = id >> 8
+  uint8[3] = id
+  uint8.set(new Uint8Array(result), 4)
+  return buf
 }

@@ -1,9 +1,7 @@
 //
 
-import { extractNo, TotalCheckboxes, type CheckboxNo, type PageNo } from 'model'
-import { toggle, type BitStorage } from 'proto'
+import { extractNo, TotalCheckboxes, type CheckboxNo } from 'model'
 import { type Db } from './db'
-import { type Requestor } from './types'
 
 const numberFormat = new Intl.NumberFormat(navigator.language)
 const dpr = window.devicePixelRatio || 1
@@ -27,7 +25,6 @@ export interface UI {
 
 export function setupUI(
   db: Db,
-  requestor: Requestor,
   wrapper: HTMLElement,
   canvas: HTMLCanvasElement,
   onRowChange?: (firstCheckbox: number) => void
@@ -60,7 +57,6 @@ export function setupUI(
     const y = event.clientY - rect.top
 
     presentation?.click(x, y)
-    scheduleDraw()
   })
 
   canvas.addEventListener(
@@ -98,17 +94,6 @@ export function setupUI(
     const rows = Math.ceil(height / cellSize)
 
     let offsetPixels = 0 // vertical offset in pixels for smooth scrolling
-
-    let pageNo = 0 as PageNo
-    let page = db.getPage(pageNo)
-
-    function getPage(no: PageNo): BitStorage {
-      if (no !== pageNo) {
-        pageNo = no
-        page = db.getPage(no)
-      }
-      return page
-    }
 
     const checkboxFunction = cellSize <= 8 ? smallCheckbox : bigCheckbox
 
@@ -162,13 +147,12 @@ export function setupUI(
             if (checkboxNo >= TotalCheckboxes) break
 
             const checkbox = extractNo(checkboxNo)
-            const page = getPage(checkbox.page)
             checkboxFunction(
               ctx,
               leftOffset + c * cellSize,
               r * cellSize,
               cellSize,
-              page.get(checkbox.offset) !== 0
+              db.get(checkbox) !== 0
             )
           }
         })
@@ -203,13 +187,7 @@ export function setupUI(
           const firstRow = Math.floor(firstCheckbox / cols)
           const no = ((firstRow + cy) * cols + cx) as CheckboxNo
           const checkbox = extractNo(no)
-          const page = getPage(checkbox.page)
-          page.toggle(checkbox.offset)
-
-          requestor.request(toggle, { page: pageNo, offset: checkbox.offset }).catch((error) => {
-            page.toggle(checkbox.offset) // revert
-            console.error('error toggling', pageNo, checkbox.offset, error)
-          })
+          db.toggle(checkbox)
         }
       },
     }
