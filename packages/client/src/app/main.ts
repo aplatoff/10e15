@@ -16,7 +16,9 @@ const largerButton = document.getElementById('larger') as HTMLButtonElement
 const wrapper = document.getElementById('canvas-wrapper') as HTMLDivElement
 const canvas = document.getElementById('checkboxes') as HTMLCanvasElement
 
-const ui = setupUI(db, wrapper, canvas, (firstCheckbox) => {
+const time = document.getElementById('time') as HTMLElement
+
+const ui = setupUI(db, wrapper, canvas, time, (firstCheckbox) => {
   gotoInput.value = firstCheckbox.toString()
 })
 

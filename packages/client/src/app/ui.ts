@@ -27,6 +27,7 @@ export function setupUI(
   db: Db,
   wrapper: HTMLElement,
   canvas: HTMLCanvasElement,
+  timeDiv: HTMLElement,
   onRowChange?: (firstCheckbox: number) => void
 ): UI {
   let cellSize = maxCellSize
@@ -35,6 +36,8 @@ export function setupUI(
   let animationFrameId: number | undefined
 
   function scheduleDraw() {
+    const time = db.getTime()
+    timeDiv.textContent = numberFormat.format(Number(time))
     if (animationFrameId === undefined) {
       animationFrameId = requestAnimationFrame(() => {
         presentation?.draw()
@@ -52,11 +55,13 @@ export function setupUI(
   canvas.style.display = 'block'
 
   canvas.addEventListener('click', (event) => {
+    event.preventDefault()
     const rect = canvas.getBoundingClientRect()
     const x = event.clientX - rect.left
     const y = event.clientY - rect.top
 
     presentation?.click(x, y)
+    return false
   })
 
   canvas.addEventListener(

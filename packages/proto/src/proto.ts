@@ -8,6 +8,7 @@ export const RequestPageData = 0x01
 
 // U P D A T E S
 export const CheckboxToggled = 0x80
+export const ChunkData = 0x81
 
 // R E S P O N S E S
 export const ResultResponse = 0xfe
@@ -28,12 +29,30 @@ export function encodeRequestPageData(page: PageNo): ArrayBufferLike {
 
 //
 
-export function broadcastCheckboxToggled(page: PageNo, offset: number): ArrayBufferLike {
-  const broadcast = new DataView(new ArrayBuffer(8))
+export function broadcastCheckboxToggled(
+  page: PageNo,
+  offset: number,
+  time: bigint
+): ArrayBufferLike {
+  const broadcast = new DataView(new ArrayBuffer(16))
   broadcast.setUint8(0, CheckboxToggled)
   broadcast.setUint8(1, offset >>> 16)
   broadcast.setUint16(2, offset)
   broadcast.setUint32(4, page)
+  broadcast.setBigUint64(8, time)
+  return broadcast.buffer
+}
+
+export function broadcastChunkData(
+  page: PageNo,
+  chunk: number,
+  data: ArrayBufferLike
+): ArrayBufferLike {
+  const broadcast = new DataView(new ArrayBuffer(6 + data.byteLength))
+  broadcast.setUint8(0, ChunkData)
+  broadcast.setUint8(1, chunk)
+  broadcast.setUint32(4, page)
+  new Uint8Array(broadcast.buffer).set(new Uint8Array(data), 6)
   return broadcast.buffer
 }
 

@@ -1,14 +1,9 @@
 //
 
+import type { ServerWebSocket } from 'bun'
 import type { PageNo } from 'model'
-import {
-  RequestPageData,
-  ToggleCheckbox,
-  broadcastCheckboxToggled,
-  errorResponse,
-  resultResponse,
-} from 'proto'
-import { createDb, production } from './db'
+import { broadcastCheckboxToggled, broadcastChunkData, errorResponse, resultResponse } from 'proto'
+import { createDb, production, type Db } from './db'
 
 type ClientData = {}
 
@@ -17,14 +12,37 @@ const welcomeMessage =
 
 const broadcastTopic = 'everyone'
 
+async function handleToggleCheckbox(
+  ws: ServerWebSocket<ClientData>,
+  db: Db,
+  message: Buffer
+): Promise<ArrayBuffer | undefined> {
+  const offset = message.readUint32BE(0)
+  const pageNo = message.readUint32BE(4) as PageNo
+  const time = await db.toggle(pageNo, offset)
+  ws.publish(broadcastTopic, broadcastCheckboxToggled(pageNo, offset, time))
+  return
+}
+
+async function handleRequestPageData(
+  ws: ServerWebSocket<ClientData>,
+  db: Db,
+  message: Buffer
+): Promise<ArrayBuffer | undefined> {
+  const pageNo = message.readUint32BE(0) as PageNo
+  await db.save(pageNo, (data, chunk) => ws.send(broadcastChunkData(pageNo, chunk, data)))
+  return
+}
+
+const handlers = [handleToggleCheckbox, handleRequestPageData]
+
 export function createServer() {
-  const db = createDb(production)
+  const db = createDb(production, BigInt(0))
 
   const server = Bun.serve<ClientData>({
     fetch(req, server) {
       const url = new URL(req.url)
       if (url.pathname === '/proto') {
-        console.log(`upgrade!`)
         const success = server.upgrade(req, { data: {} })
         return success ? undefined : new Response('WebSocket upgrade error', { status: 400 })
       }
@@ -41,26 +59,13 @@ export function createServer() {
         } else {
           const commandId = message.readUInt8(0)
           const requestId = (message.readUInt8(1) << 16) | message.readUint16BE(2)
-          switch (commandId) {
-            case ToggleCheckbox:
-              const offset = message.readUint32BE(4)
-              const page = message.readUint32BE(8) as PageNo
-              try {
-                await db.toggle(page, offset)
-                ws.send(resultResponse(requestId))
-                ws.publish(broadcastTopic, broadcastCheckboxToggled(page, offset))
-              } catch (error) {
-                console.error(error)
-                ws.send(errorResponse(requestId, 0))
-              }
-              break
-            case RequestPageData:
-              const pageNo = message.readUint32BE(4) as PageNo
-              const payload = await db.serialize(pageNo)
-              ws.send(resultResponse(requestId, payload))
-              break
-            default:
-              console.log('unknown command')
+          if (commandId < 0 && commandId >= handlers.length) return
+          try {
+            const result = await handlers[commandId](ws, db, message.subarray(4))
+            ws.send(resultResponse(requestId, result))
+          } catch (error) {
+            console.error(error)
+            ws.send(errorResponse(requestId, 0))
           }
         }
       },

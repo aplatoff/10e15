@@ -12,8 +12,8 @@ export interface BitStorage {
 export interface Chunk extends BitStorage {
   readonly kind: ChunkKind
   bytes(): number
-  load(buf: Uint16Array): number // return the number of 16bit words consumed
-  save(data: Uint16Array): void
+  save(): ArrayBufferLike
+  load(buf: Uint16Array): void
   optimize(): Chunk // optimize to a more memory efficient storage
   print(): void
 }
@@ -33,9 +33,9 @@ export interface TxStorage extends Chunk {
 }
 
 export interface Page extends BitStorage {
-  optimize(): number // optimize for storage and return the number of bytes to save content
-  serialize(buf: Uint16Array): void
-  load(buf: Uint16Array): void
+  // optimize(): number // optimize for storage and return the number of bytes to save content
+  save(sink: (data: ArrayBufferLike, n: number) => void): void
+  loadChunk(buf: ArrayBufferLike, n: number): void
 }
 
 // For efficiency, I'm limiting ChunkLength to 64K checkboxes per chunk
@@ -57,11 +57,12 @@ export function createBitmap(): Bitmap {
     get,
     ones: () => ones,
     toTxStorage: (capacity: number): TxStorage => createTxStorage(capacity).fromBitmap(bitmap),
-    save: (buf: Uint16Array) => buf.set(data),
-    load: (buf: Uint16Array): number => {
-      data.set(buf)
-      return BitmapSize16Bits
+    save: (): ArrayBufferLike => {
+      const buf = new Uint16Array(BitmapSize16Bits)
+      buf.set(data)
+      return buf.buffer
     },
+    load: (buf: Uint16Array) => data.set(buf),
     bytes: () => BitmapSize16Bits << 1,
     optimize: (): Chunk => (ones >= MaxTxLength ? bitmap : bitmap.toTxStorage(ones)),
     print: () => console.log('bitmap'),
@@ -82,7 +83,6 @@ function createTxStorage(capacity: number): TxStorage {
     kind: 'txes' as const,
     toggle(offset: number) {
       data[size++] = offset
-      console.log('txes', offset, size)
       return size === data.length
     },
     get(offset: number): number {
@@ -102,15 +102,16 @@ function createTxStorage(capacity: number): TxStorage {
       return txes
     },
     isFull: () => size === data.length,
-    save: (buf: Uint16Array) => {
+    save: (): ArrayBufferLike => {
+      const buf = new Uint16Array(size + 1)
       buf[0] = size
       buf.set(data.subarray(0, size), 1)
+      return buf.buffer
     },
-    load: (buf: Uint16Array): number => {
+    load: (buf: Uint16Array) => {
       size = buf[0]
       data = new Uint16Array(size)
       data.set(buf.subarray(1))
-      return size + 1
     },
     optimize: () => {
       const bitmap = txes.toBitmap()
@@ -125,12 +126,6 @@ function createTxStorage(capacity: number): TxStorage {
 
 const ChunksPerPage = CheckboxesPerPage >> 16
 
-// Serialized as Uint16Array
-// [ nShunks, n1, n2, n3, ... ], n1, n2, n3 are type and order num of chunks
-// type = 0: bitmap, 1: txStorage
-// for tx:  [ size, data0, data1, ... ]
-// for bitmap: [ data0, data1, ... ]
-
 export function createPage(): Page {
   const chunks = new Array<Chunk | undefined>(ChunksPerPage)
 
@@ -142,58 +137,51 @@ export function createPage(): Page {
     return newChunk
   }
 
+  const saveChunk = (chunk: Chunk): ArrayBufferLike => {
+    const optimized = chunk.optimize()
+    const data = optimized.save()
+    const size = data.byteLength >>> 1
+    const buf = new Uint16Array(size + 1)
+    buf[0] = optimized.kind === 'bitmap' ? 0 : 1
+    buf.set(new Uint16Array(data), 1)
+    return buf.buffer
+  }
+
   return {
     toggle(offset: number) {
       const n = offset >> 16
-      const chunk = getChunk(n)
-      chunk.toggle(offset & 0xffff)
+      let chunk = getChunk(n)
       if (chunk.kind === 'txes') {
         const txes = chunk as TxStorage
         if (txes.isFull()) {
           const bitmap = txes.toBitmap()
           const size = bitmap.ones()
-          chunks[n] = size > 1024 ? bitmap : bitmap.toTxStorage(size << 1)
+          chunk = size > 1024 ? bitmap : bitmap.toTxStorage(size << 1)
+          chunks[n] = chunk
         }
       }
-      return false
+      chunk.toggle(offset & 0xffff)
     },
-    get: (offset: number): number => getChunk(offset >> 16).get(offset & 0xffff),
-    serialize: (result: Uint16Array) => {
-      let offset = 1
-      let nChunks = 0
-      for (let i = 0; i < ChunksPerPage; i++) {
-        if (chunks[i]) {
-          nChunks++
-          const chunk = chunks[i]!
-          result[offset++] = i | (chunk.kind === 'bitmap' ? 0 : 0x8000)
-          chunk.save(result.subarray(offset))
-          offset += chunk.bytes() >> 1
-        }
-      }
-      if (nChunks > 0) result[0] = nChunks
-      return result
+    get: (offset: number): number => getChunk(offset >>> 16).get(offset & 0xffff),
+    save: (sink: (data: ArrayBufferLike, n: number) => void) =>
+      chunks.forEach((chunk, i) => {
+        if (chunk) sink(saveChunk(chunk), i)
+      }),
+    loadChunk: (buf: ArrayBufferLike, n: number) => {
+      const data = new Uint16Array(buf)
+      const type = data[0]
+      const chunk = type === 0 ? createBitmap() : createTxStorage(0)
+      chunk.load(new Uint16Array(data.buffer, 2))
+      chunks[n] = chunk
     },
-    load: (buf: Uint16Array) => {
-      const nChunks = buf[0]
-      let offset = 1
-      for (let i = 0; i < nChunks; i++) {
-        const header = buf[offset++]
-        const n = header & 0xff
-        const chunk = (header & 0x8000) === 0x8000 ? createTxStorage(0) : createBitmap()
-        offset += chunk.load(buf.subarray(offset))
-        console.log('loaded', n)
-        chunk.print()
-        chunks[n] = chunk
-      }
-    },
-    optimize: (): number => {
-      let size = 0
-      for (let i = 0; i < ChunksPerPage; i++)
-        if (chunks[i]) {
-          chunks[i] = chunks[i]!.optimize()
-          size += 2 + chunks[i]!.bytes()
-        }
-      return size > 0 ? size + 2 : 0
-    },
+    // optimize: (): number => {
+    //   let size = 0
+    //   for (let i = 0; i < ChunksPerPage; i++)
+    //     if (chunks[i]) {
+    //       chunks[i] = chunks[i]!.optimize()
+    //       size += 2 + chunks[i]!.bytes()
+    //     }
+    //   return size > 0 ? size + 2 : 0
+    // },
   }
 }

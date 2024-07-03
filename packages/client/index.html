@@ -17,6 +17,7 @@
         margin: 0;
         padding: 0;
         font-family: 'JetBrains Mono', monospace;
+        user-select: none;
       }
 
       header {
@@ -51,10 +52,11 @@
   </head>
   <body>
     <header>
-      <div class="title">One Quadrillion Checkboxes (1,000,000,000,000,000)</div>
+      <div class="title">One Quadrillion Checkboxes</div>
       <input type="text" id="goto" placeholder="Goto checkbox..." />
       <button id="smaller">Smaller</button>
       <button id="larger" disabled>Larger</button>
+      <div>Clicks: <span id="time">0</span></div>
     </header>
     <div id="canvas-wrapper">
       <canvas id="checkboxes" />

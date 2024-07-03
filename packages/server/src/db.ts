@@ -21,6 +21,7 @@ export const production: Config = {
     '/mnt/disk6',
     '/mnt/disk7',
     '/mnt/disk8',
+    '/mnt/disk9',
     '/mnt/diska',
     '/mnt/diskb',
     '/mnt/diskc',
@@ -41,13 +42,16 @@ type PageDescriptor = {
 }
 
 export interface Db {
-  toggle(page: PageNo, offset: number): Promise<void> // queue in the future
-  serialize(page: PageNo): Promise<ArrayBuffer>
+  // getPage(page: PageNo): Promise<Page>
+  toggle(page: PageNo, offset: number): Promise<bigint> // queue in the future
+  save(pageNo: PageNo, sink: (data: ArrayBufferLike, chunk: number) => void): Promise<void>
 }
 
 const name = (value: number, pad: number) => value.toString(16).padStart(pad, '0')
 
-export function createDb(config: Config): Db {
+export function createDb(config: Config, time: BigInt): Db {
+  let globalTime = time
+
   const pages = new Map<PageNo, PageDescriptor>()
 
   async function createPageDescriptor(pageNo: PageNo): Promise<PageDescriptor> {
@@ -83,20 +87,21 @@ export function createDb(config: Config): Db {
   }
 
   return {
-    async toggle(pageNo: PageNo, offset: number): Promise<void> {
+    // getPage: async (pageNo: PageNo): Promise<Page> => (await getPage(pageNo)).transient,
+    async toggle(pageNo: PageNo, offset: number): Promise<bigint> {
       const page = await getPage(pageNo)
-      return page.transient.toggle(offset)
+      page.transient.toggle(offset)
+      globalTime = globalTime + BigInt(1)
+      console.log('time', globalTime)
+      return globalTime
     },
-
-    async serialize(n: PageNo): Promise<ArrayBuffer> {
-      const desc = await getPage(n)
+    async save(
+      pageNo: PageNo,
+      sink: (data: ArrayBufferLike, chunk: number) => void
+    ): Promise<void> {
+      const desc = await getPage(pageNo)
       const page = desc.transient
-      const size = page.optimize()
-      console.log('serialize page no', n, 'to buffer size (bytes)', size)
-
-      const buf = new ArrayBuffer(size)
-      page.serialize(new Uint16Array(buf))
-      return buf
+      page.save(sink)
     },
   }
 }

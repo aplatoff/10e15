@@ -4,6 +4,7 @@ import { LRUCache } from 'lru-cache'
 import { Checkbox, type PageNo } from 'model'
 import {
   CheckboxToggled,
+  ChunkData,
   createPage,
   encodeRequestPageData,
   encodeToggleCheckbox,
@@ -16,17 +17,28 @@ import { createServer } from './server'
 export interface Db {
   toggle(checkbox: Checkbox): void
   get(checkbox: Checkbox): number
+  getTime(): bigint
 }
 
 export function createDb(url: string, scheduleDraw: () => void): Db {
+  let time = 0n
+
   const server = createServer(url, (updateId: number, payload: ArrayBuffer) => {
+    const view = new DataView(payload)
     switch (updateId) {
       case CheckboxToggled:
-        const view = new DataView(payload)
         const offset = (view.getUint8(0) << 16) | view.getUint16(1)
         const pageNo = view.getUint32(3) as PageNo
+        time = view.getBigUint64(7)
         const page = getPage(pageNo)
         page.toggle(offset)
+        scheduleDraw()
+        break
+      case ChunkData:
+        const chunk = view.getUint8(0)
+        const i = view.getUint32(1) as PageNo
+        const pg = getPage(i)
+        pg.loadChunk(payload.slice(5), chunk)
         scheduleDraw()
         break
       default:
@@ -47,8 +59,8 @@ export function createDb(url: string, scheduleDraw: () => void): Db {
       .sendCommand(RequestPageData, encodeRequestPageData(page))
       .then((result) => {
         console.log('subscribed to', page, result)
-        newPage.load(new Uint16Array(result))
-        scheduleDraw()
+        // newPage.load(new Uint16Array(result))
+        // scheduleDraw()
       })
       .catch((error) => {
         console.error('error subscribing to', page, error)
@@ -58,9 +70,11 @@ export function createDb(url: string, scheduleDraw: () => void): Db {
   }
 
   return {
+    getTime: () => time,
     toggle(checkbox: Checkbox) {
       const page = getPage(checkbox.page)
       page.toggle(checkbox.offset)
+      ++time
       scheduleDraw()
 
       server.sendCommand(ToggleCheckbox, encodeToggleCheckbox(checkbox)).catch((error) => {
