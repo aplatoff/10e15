@@ -7,6 +7,7 @@ import {
   ChunkData,
   decodeCheckboxToggled,
   decodeChunkData,
+  decodeRequestPageDataResult,
   decodeToggleCheckboxResult,
   encodeRequestPageData,
   encodeToggleCheckbox,
@@ -27,23 +28,26 @@ async function toggleOnServer(server: Server, checkbox: Checkbox): Promise<Time>
   return decodeToggleCheckboxResult(response)
 }
 
-export function createDb(url: string, scheduleDraw: (time?: Time) => void): Db {
-  const server = createServer(url, (updateId: number, payload: ArrayBuffer) => {
-    switch (updateId) {
-      case CheckboxToggled:
-        const toggled = decodeCheckboxToggled(payload)
-        getPage(toggled.page).toggle(toggled.offset, toggled.time)
-        scheduleDraw()
-        break
-      case ChunkData:
-        const data = decodeChunkData(payload)
-        getPage(data.page).loadChunk(new Uint16Array(data.data), data.kind, data.chunk)
-        scheduleDraw()
-        break
-      default:
-        console.error('unknown update', updateId)
+export function createDb(host: string, scheduleDraw: (time?: Time) => void): Db {
+  const server = createServer(
+    `ws://${host}:3000/proto`,
+    (updateId: number, payload: ArrayBuffer) => {
+      switch (updateId) {
+        case CheckboxToggled:
+          const toggled = decodeCheckboxToggled(payload)
+          getPage(toggled.page).transient.toggle(toggled.offset, toggled.time)
+          scheduleDraw()
+          break
+        case ChunkData:
+          const data = decodeChunkData(payload)
+          getPage(data.page).transient.loadChunk(new Uint16Array(data.data), data.kind, data.chunk)
+          scheduleDraw()
+          break
+        default:
+          console.error('unknown update', updateId)
+      }
     }
-  })
+  )
 
   class ClientPage extends Page {
     constructor(private readonly page: PageNo) {
@@ -60,7 +64,7 @@ export function createDb(url: string, scheduleDraw: (time?: Time) => void): Db {
 
       toggleOnServer(server, { page: this.page, offset })
         .then((time: Time) => {
-          this.confirmToggle(time)
+          this.setTime(time)
           scheduleDraw(time)
         })
         .catch((error) => {
@@ -71,14 +75,36 @@ export function createDb(url: string, scheduleDraw: (time?: Time) => void): Db {
     }
   }
 
+  const pageServer = `https://${host}:8000/pages/`
+
   class ClientPersistentPage extends PersistentPage {
+    public readonly transient: ClientPage
+
     constructor(public readonly page: PageNo) {
-      super(new ClientPage(page))
+      super()
+      this.transient = new ClientPage(page)
     }
 
-    optimisticToggle(offset: number) {
-      const transient = this.transient as ClientPage
-      transient.optimisticToggle(offset)
+    public get(offset: number) {
+      return this.transient.get(offset) ^ super.get(offset)
+    }
+
+    public async load() {
+      console.log('loading transient page', this.page)
+      const response = await server.sendCommand(encodeRequestPageData(this.page))
+      const time = decodeRequestPageDataResult(response)
+      if (this.getTime() !== time) {
+        console.error('persistent page outdated', this.getTime(), time)
+        const url = `${pageServer}${this.page}-${time}`
+        console.log('fetching persistent page', url)
+        try {
+          const response = await fetch(url)
+          if (!response.ok) throw new Error(`Response status: ${response.status}`)
+          this.loadFromBuffer(await response.arrayBuffer())
+        } catch (error) {
+          console.error(error)
+        }
+      }
     }
   }
 
@@ -107,16 +133,7 @@ export function createDb(url: string, scheduleDraw: (time?: Time) => void): Db {
     const newPage = new ClientPersistentPage(page)
     screenCache[page & 1] = newPage
     pageCache.set(page, newPage)
-
-    server
-      .sendCommand(encodeRequestPageData(page))
-      .then((result) => {
-        console.log('subscribed to', page, result)
-      })
-      .catch((error) => {
-        console.error('error subscribing to', page, error)
-      })
-
+    newPage.load()
     return newPage
   }
 
@@ -132,7 +149,7 @@ export function createDb(url: string, scheduleDraw: (time?: Time) => void): Db {
     },
     toggle(checkbox: Checkbox) {
       const page = getPage(checkbox.page)
-      page.optimisticToggle(checkbox.offset)
+      page.transient.optimisticToggle(checkbox.offset)
     },
   }
 }

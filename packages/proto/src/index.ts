@@ -1,6 +1,6 @@
 //
 
-export { type ChunkKind } from './chunk'
+export { type Chunk, type ChunkKind } from './chunk'
 export { createClient } from './client'
 export { encodeResult } from './encoders'
 export * from './errors'

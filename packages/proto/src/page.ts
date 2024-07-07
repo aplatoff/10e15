@@ -15,7 +15,7 @@ const ChunksPerPage = Number(CheckboxesPerPage / CheckboxesPerChunk)
 console.log('Chunks per page', ChunksPerPage)
 
 export class Page {
-  protected globalTime: Time = 0n as Time
+  private globalTime: Time = 0n as Time
   protected readonly chunks = new Array<Chunk | undefined>(ChunksPerPage)
 
   private getChunk(n: number): Chunk {
@@ -42,14 +42,14 @@ export class Page {
     chunk.toggle(offset & 0xffff)
   }
 
-  protected confirmToggle(time: Time): void {
+  protected setTime(time: Time): void {
     if (this.globalTime < time) this.globalTime = time
     else console.error('toggle confirmed: time in the past', this.globalTime, time)
   }
 
   public toggle(offset: number, time: Time) {
     this.doToggle(offset)
-    this.confirmToggle(time)
+    this.setTime(time)
   }
 
   public get(offset: number): number {
@@ -66,48 +66,44 @@ export class Page {
     })
   }
 
-  public loadChunk(buf: Uint16Array, kind: ChunkKind, n: number) {
+  public loadChunk(buf: Uint16Array, kind: ChunkKind, n: number): number {
     const chunk = kind === BitmapChunk ? createBitmap() : createTxStorage(0)
-    chunk.load(buf)
+    const bytes = chunk.load(buf)
     this.chunks[n] = chunk
+    return bytes
   }
 }
 
-// P E R S I S T E N T   P A G E
+///
 
 export class PersistentPage extends Page {
-  constructor(protected transient: Page) {
-    super()
+  protected doToggle() {
+    throw new Error('not allowed')
   }
 
-  public toggle(offset: number, time: Time) {
-    this.transient.toggle(offset, time)
+  public merge(page: Page) {
+    console.log('merging page, time', page.getTime(), 'into', this.getTime())
+    page.optimize((chunk, n) => {
+      if (this.chunks[n]) {
+        const merged = mergeBitmapData(
+          chunk.toBitmap().toBitmapData(),
+          this.chunks[n].toBitmap().toBitmapData()
+        )
+        this.chunks[n] = merged.optimize()
+      } else this.chunks[n] = chunk
+    })
+    this.setTime(page.getTime())
   }
 
-  // public getTime() {
-  //   const transientTime = this.transient.getTime()
-  //   return transientTime !== 0n ? transientTime : super.getTime()
-  // }
-
-  public get(offset: number) {
-    return this.transient.get(offset) ^ super.get(offset)
-  }
-
-  public optimize(sink: (chunk: Chunk, n: number) => void): void {
-    const transientTime = this.transient.getTime()
-    console.log('optimize, transient time', transientTime, 'global time', this.globalTime)
-    if (transientTime !== 0n) {
-      this.transient.optimize((chunk, n) => {
-        if (this.chunks[n]) {
-          const merged = mergeBitmapData(
-            chunk.toBitmap().toBitmapData(),
-            this.chunks[n].toBitmap().toBitmapData()
-          )
-          this.chunks[n] = merged.optimize()
-        } else this.chunks[n] = chunk
-      })
-      this.globalTime = transientTime
+  public loadFromBuffer(buffer: ArrayBuffer) {
+    const view = new DataView(buffer)
+    let offset = 0
+    while (true) {
+      const n = view.getUint8(offset)
+      if (n === 0xff) break
+      const kind = view.getUint8(offset + 1)
+      offset += 2
+      offset += this.loadChunk(new Uint16Array(buffer, offset, n), kind as ChunkKind, n)
     }
-    super.optimize(sink)
   }
 }

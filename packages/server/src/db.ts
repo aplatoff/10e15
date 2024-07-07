@@ -8,6 +8,8 @@ type Config = {
   driveBits: number
   paths: string[]
   memory: number
+  maxTransientCache: number
+  maxPersistentCache: number
 }
 
 export const production: Config = {
@@ -31,12 +33,16 @@ export const production: Config = {
     '/mnt/diskf',
   ],
   memory: 64 * 1024, // MB
+  maxTransientCache: 16 * 1024,
+  maxPersistentCache: 1 << 20,
 }
 
 export const dev: Config = {
   driveBits: 0,
-  paths: ['/tmp'],
+  paths: ['/tmp/10e15'],
   memory: 1 * 1024, // MB
+  maxTransientCache: 2,
+  maxPersistentCache: 2,
 }
 
 export interface Db {
@@ -49,28 +55,48 @@ export interface Db {
 
 const name = (value: number, pad: number) => value.toString(16).padStart(pad, '0')
 
-class ServerPersistentPage extends PersistentPage {
-  constructor() {
-    super(new Page())
-  }
-  async sendTransientData(
-    send: (data: ArrayBufferLike, kind: ChunkKind, chunk: number) => void
-  ): Promise<void> {
-    this.transient.optimize((chunk, n) => send(chunk.save().buffer, chunk.kind(), n))
-  }
+type PersistentPageDesciptor = {
+  readonly time: Time
 }
 
 export function createDb(config: Config, time: Time): Db {
   let globalTime = time
 
-  const pages = new LRUCache<PageNo, ServerPersistentPage>({
-    max: 2,
-    dispose: (page, key) => {
-      console.log('save page', key, 'to', getPath(key))
-      page.optimize((chunk, n) => {
-        console.log('save chunk', n, chunk.kind())
+  const transientPages = new LRUCache<PageNo, Page>({
+    max: config.maxTransientCache,
+    dispose: async (page, pageNo) => {
+      const path = getPath(pageNo)
+      console.log('save page', pageNo, 'to', path)
+
+      let persistentPage: PersistentPage | null = null
+      const descriptor = await getPageDesciptor(pageNo)
+      if (descriptor.time !== 0n) {
+        const file = Bun.file(path)
+        persistentPage = new PersistentPage()
+        persistentPage.loadFromBuffer(await file.arrayBuffer())
+      } else persistentPage = new PersistentPage()
+
+      const writer = Bun.file(path).writer()
+      const buf = new Uint8Array(2)
+      persistentPage.merge(page)
+      persistentPage.optimize((chunk, n) => {
+        buf[0] = n
+        buf[1] = chunk.kind()
+        writer.write(buf)
+        writer.write(chunk.save())
       })
+      buf[0] = 0xff
+      buf[1] = 0xff
+      writer.write(buf)
+      writer.end()
+
+      const meta = Bun.file(path + '.meta').writer()
+      meta.write(persistentPage.getTime().toString())
     },
+  })
+
+  const persistentPages = new LRUCache<PageNo, PersistentPageDesciptor>({
+    max: config.maxPersistentCache,
   })
 
   function getPath(pageNo: PageNo) {
@@ -83,24 +109,33 @@ export function createDb(config: Config, time: Time): Db {
     return `${config.paths[drive]}/${name(root, 2)}/${name(subfolder, 2)}/${name(file, 3)}`
   }
 
-  async function loadPersistentPage(pageNo: PageNo): Promise<ServerPersistentPage> {
-    const path = getPath(pageNo)
-    console.log('path', pageNo, path)
-
-    const meta = Bun.file(`${path}.meta`)
-    const exists = await meta.exists()
-    if (!exists) {
-      return new ServerPersistentPage()
+  async function getPageDesciptor(pageNo: PageNo): Promise<PersistentPageDesciptor> {
+    const descriptor = persistentPages.get(pageNo)
+    if (descriptor === undefined) {
+      const descriptor = await createPageDescriptor(pageNo)
+      persistentPages.set(pageNo, descriptor)
+      return descriptor
     }
-
-    throw new Error('Not implemented')
+    return descriptor
   }
 
-  async function getPage(pageNo: PageNo): Promise<ServerPersistentPage> {
-    const page = pages.get(pageNo)
+  async function createPageDescriptor(pageNo: PageNo): Promise<PersistentPageDesciptor> {
+    const path = getPath(pageNo)
+    console.log('creating page decriptor', pageNo, 'path', path)
+    const meta = Bun.file(path + '.meta')
+    const exists = await meta.exists()
+    if (!exists) return { time: 0n as Time }
+    const text = await meta.text()
+    const time = BigInt(text) as Time
+    console.log('found peristent page at ', time)
+    return { time }
+  }
+
+  function getTransientPage(pageNo: PageNo): Page {
+    const page = transientPages.get(pageNo)
     if (page === undefined) {
-      const page = await loadPersistentPage(pageNo)
-      pages.set(pageNo, page)
+      const page = new Page()
+      transientPages.set(pageNo, page)
       return page
     }
     return page
@@ -108,7 +143,7 @@ export function createDb(config: Config, time: Time): Db {
 
   return {
     async toggle(checkbox: Checkbox): Promise<Time> {
-      const page = await getPage(checkbox.page)
+      const page = getTransientPage(checkbox.page)
       globalTime = (globalTime + 1n) as Time
       page.toggle(checkbox.offset, globalTime)
       console.log('time', globalTime)
@@ -118,10 +153,12 @@ export function createDb(config: Config, time: Time): Db {
       pageNo: PageNo,
       send: (data: ArrayBufferLike, kind: ChunkKind, chunk: number) => void
     ): Promise<Time> {
-      const page = await getPage(pageNo)
-      const time = page.getTime()
-      page.sendTransientData(send)
-      return time
+      const page = transientPages.get(pageNo)
+      if (page !== undefined) {
+        page.optimize((chunk, n) => send(chunk.save().buffer, chunk.kind(), n))
+      }
+      const descriptor = await getPageDesciptor(pageNo)
+      return descriptor.time
     },
   }
 }

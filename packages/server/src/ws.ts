@@ -55,6 +55,8 @@ async function handleRequestPageData(
 }
 
 const handlers = [handleToggleCheckbox, handleRequestPageData]
+const pagesPath = '/pages/'
+const pagesPathLength = pagesPath.length
 
 export function createServer() {
   const db = createDb(dev, 0n as Time)
@@ -62,7 +64,14 @@ export function createServer() {
   const server = Bun.serve<ClientData>({
     fetch(req, server) {
       const url = new URL(req.url)
-      if (url.pathname === '/proto') {
+      if (url.pathname.startsWith(pagesPath)) {
+        const pageCode = url.pathname.slice(pagesPathLength).split('-')
+        const page = Number(pageCode[0]) as PageNo
+        const time = BigInt(pageCode[1]) as Time
+        console.log(`serving page data ${page} with time ${time}`)
+
+        return new Response(db.getPage(pageNo))
+      } else if (url.pathname === '/proto') {
         const success = server.upgrade(req, { data: {} })
         return success ? undefined : new Response('WebSocket upgrade error', { status: 400 })
       }

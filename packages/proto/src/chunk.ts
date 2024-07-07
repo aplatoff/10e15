@@ -14,7 +14,7 @@ export interface Chunk {
   isFull(): boolean
   bytes(): number
   save(): Uint16Array
-  load(buf: Uint16Array): void
+  load(buf: Uint16Array): number
   optimize(): Chunk
   print(): void
   toBitmap(): Bitmap
@@ -66,7 +66,10 @@ export function createBitmapFromData(data: Uint16Array): Bitmap {
       buf.set(data)
       return buf
     },
-    load: (buf: Uint16Array) => data.set(buf),
+    load: (buf: Uint16Array): number => {
+      data.set(buf)
+      return BitmapSize16Bits << 1
+    },
     bytes: () => BitmapSize16Bits << 1,
     optimize: (): Chunk => (ones >= MaxTxLength ? bitmap : bitmap.toTxStorage(ones)),
     print: () => console.log('bitmap'),
@@ -130,6 +133,7 @@ export function createTxStorage(capacity: number): TxStorage {
       size = buf[0]
       data = new Uint16Array(size)
       data.set(buf.subarray(1))
+      return (size + 1) << 1
     },
     optimize: () => {
       if (optimized) return txes // assume full is optimized, which is not always true

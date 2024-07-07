@@ -6,7 +6,7 @@ import { setupUI } from './ui'
 
 // Db setup
 
-const db = createDb('ws://localhost:3000/proto', () => ui.scheduleDraw())
+const db = createDb('localhost', () => ui.scheduleDraw())
 
 // UI setup
 
