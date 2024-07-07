@@ -118,7 +118,7 @@ export function createDb(host: string, scheduleDraw: (time?: Time) => void): Db 
 
   function getCachedPage(page: PageNo): ClientPersistentPage | undefined {
     const screen = screenCache[page & 1]
-    if (screen !== undefined) return screen
+    if (screen !== undefined && screen.page === page) return screen
 
     const cached = pageCache.get(page)
     if (cached !== undefined) {
@@ -130,6 +130,7 @@ export function createDb(host: string, scheduleDraw: (time?: Time) => void): Db 
   }
 
   function loadPage(page: PageNo): ClientPersistentPage {
+    console.log('loading page', page)
     const newPage = new ClientPersistentPage(page)
     screenCache[page & 1] = newPage
     pageCache.set(page, newPage)
