@@ -30,6 +30,18 @@ gotoInput.addEventListener('input', (e: Event) => {
   ui.goto(BigInt(value) as CheckboxNo)
 })
 
+document.addEventListener('keypress', (event) => {
+  event.preventDefault()
+  var key = event.key
+  gotoInput.value += key
+  gotoInput.focus()
+  const inputEvent = new Event('input', {
+    bubbles: true,
+    cancelable: true,
+  })
+  gotoInput.dispatchEvent(inputEvent)
+})
+
 smallerButton.addEventListener('click', () => {
   smallerButton.disabled = ui.makeSmaller()
   largerButton.disabled = false

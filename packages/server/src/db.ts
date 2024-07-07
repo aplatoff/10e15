@@ -2,6 +2,7 @@
 
 import { LRUCache } from 'lru-cache'
 import type { Checkbox, PageNo, Time } from 'model'
+import { mkdir } from 'node:fs/promises'
 import { Page, PersistentPage, type ChunkKind } from 'proto'
 
 type Config = {
@@ -41,8 +42,8 @@ export const dev: Config = {
   driveBits: 0,
   paths: ['/tmp/10e15'],
   memory: 1 * 1024, // MB
-  maxTransientCache: 2,
-  maxPersistentCache: 2,
+  maxTransientCache: 20000,
+  maxPersistentCache: 20000,
 }
 
 export interface Db {
@@ -71,12 +72,14 @@ export function createDb(config: Config, time: Time): Db {
       let persistentPage: PersistentPage | null = null
       const descriptor = await getPageDesciptor(pageNo)
       if (descriptor.time !== 0n) {
-        const file = Bun.file(path)
+        const file = Bun.file(path.join('/'))
         persistentPage = new PersistentPage()
         persistentPage.loadFromBuffer(await file.arrayBuffer())
       } else persistentPage = new PersistentPage()
 
-      const writer = Bun.file(path).writer()
+      await mkdir(path[0], { recursive: true })
+
+      const writer = Bun.file(path.join('/')).writer()
       const buf = new Uint8Array(2)
       persistentPage.merge(page)
       persistentPage.optimize((chunk, n) => {
@@ -90,8 +93,7 @@ export function createDb(config: Config, time: Time): Db {
       writer.write(buf)
       writer.end()
 
-      const meta = Bun.file(path + '.meta').writer()
-      meta.write(persistentPage.getTime().toString())
+      Bun.write(path.join('/') + '.meta', persistentPage.getTime().toString())
     },
   })
 
@@ -106,7 +108,7 @@ export function createDb(config: Config, time: Time): Db {
     const subfolder = (root >>> 8) & 0xff
     const file = fileNo >>> 16
 
-    return `${config.paths[drive]}/${name(root, 2)}/${name(subfolder, 2)}/${name(file, 3)}`
+    return [`${config.paths[drive]}/${name(root, 2)}/${name(subfolder, 2)}`, `${name(file, 3)}`]
   }
 
   async function getPageDesciptor(pageNo: PageNo): Promise<PersistentPageDesciptor> {
