@@ -19,7 +19,6 @@ function createServer(port: number) {
       const pageCode = pageId.split('-')
       const page = Number(pageCode[0]) as PageNo
       const time = BigInt(pageCode[1]) as Time
-      console.log(`serving page data ${page} with time ${time}`)
       const path = getPath(page)
       const file = Bun.file(path)
       console.log('serving', path, file.size, file.type)

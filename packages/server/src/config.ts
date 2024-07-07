@@ -37,7 +37,7 @@ const dev: Config = {
   paths: ['/tmp'],
   memory: 1 * 1024, // MB
   maxTransientCache: 2,
-  maxPersistentCache: 20000,
+  maxPersistentCache: 2,
 }
 
 export const config = process.env.NODE_ENV === 'production' ? production : dev

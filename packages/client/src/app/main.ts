@@ -31,6 +31,7 @@ gotoInput.addEventListener('input', (e: Event) => {
 })
 
 document.addEventListener('keypress', (event) => {
+  if (event.target === gotoInput) return
   event.preventDefault()
   const inputEvent = new Event('input', { bubbles: true, cancelable: true })
   gotoInput.value += event.key
