@@ -1,12 +1,12 @@
 //
 
-import { type CheckboxNo } from 'model'
+import { type CheckboxNo, type Time } from 'model'
 import { createDb } from './db'
 import { setupUI } from './ui'
 
 // Db setup
 
-const db = createDb('localhost', () => ui.scheduleDraw())
+const db = createDb('localhost', (time?: Time) => ui.scheduleDraw(time))
 
 // UI setup
 

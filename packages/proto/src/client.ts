@@ -14,7 +14,6 @@ export const createClient = (url: string) => {
   }
   ws.onmessage = (event) => {
     const blob = event.data as Blob
-    console.log('Received ws message:', blob)
     blob.arrayBuffer().then((buffer) => {
       listeners.forEach((listener) => listener(buffer))
     })

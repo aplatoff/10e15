@@ -36,7 +36,7 @@ export function createDb(host: string, scheduleDraw: (time?: Time) => void): Db 
         case CheckboxToggled:
           const toggled = decodeCheckboxToggled(payload)
           getPage(toggled.page).transient.toggle(toggled.offset, toggled.time)
-          scheduleDraw()
+          scheduleDraw(toggled.time)
           break
         case ChunkData:
           const data = decodeChunkData(payload)
