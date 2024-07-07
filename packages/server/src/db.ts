@@ -1,7 +1,7 @@
 //
 
 import { LRUCache } from 'lru-cache'
-import type { PageNo } from 'model'
+import type { PageNo, Time } from 'model'
 import { Page, PersistentPage, type ChunkKind } from 'proto'
 
 type Config = {
@@ -40,7 +40,7 @@ export const dev: Config = {
 }
 
 export interface Db {
-  toggle(page: PageNo, offset: number): Promise<bigint>
+  toggle(page: PageNo, offset: number): Promise<Time>
   save(
     page: PageNo,
     send: (data: ArrayBufferLike, kind: ChunkKind, chunk: number) => void
@@ -96,12 +96,12 @@ export function createDb(config: Config, time: bigint): Db {
   }
 
   return {
-    async toggle(pageNo: PageNo, offset: number): Promise<bigint> {
+    async toggle(pageNo: PageNo, offset: number): Promise<Time> {
       const page = await getPage(pageNo)
       globalTime = globalTime + 1n
       page.toggle(offset, globalTime)
       console.log('time', globalTime)
-      return globalTime
+      return globalTime as Time
     },
     async save(
       pageNo: PageNo,

@@ -7,7 +7,7 @@ import {
   ChunkData,
   decodeCheckboxToggled,
   decodeChunkData,
-  decodeToggleCheckbox,
+  decodeToggleCheckboxResult,
   encodeRequestPageData,
   encodeToggleCheckbox,
   Page,
@@ -18,40 +18,16 @@ import { type Server } from './types'
 
 export interface Db {
   getPage(page: PageNo): Page
+  getCheckbox(checkbox: Checkbox): number
+  toggle(checkbox: Checkbox): void
 }
 
 async function toggleOnServer(server: Server, checkbox: Checkbox): Promise<Time> {
   const response = await server.sendCommand(encodeToggleCheckbox(checkbox))
-  return decodeToggleCheckbox(response)
+  return decodeToggleCheckboxResult(response)
 }
 
-class ClientPage extends Page {
-  constructor(
-    private readonly page: PageNo,
-    private readonly server: Server,
-    private readonly scheduleDraw: () => void
-  ) {
-    super()
-  }
-
-  toggle(offset: number, time: bigint) {
-    super.toggle(offset, time)
-    this.scheduleDraw()
-  }
-
-  optimisticToggle(offset: number) {
-    this.doToggle(offset)
-
-    toggleOnServer(this.server, { page: this.page, offset })
-      .then(this.confirmToggle.bind(this))
-      .catch((error) => {
-        console.error('toggle error', error)
-        this.doToggle(offset)
-      })
-  }
-}
-
-export function createDb(url: string, scheduleDraw: () => void): Db {
+export function createDb(url: string, scheduleDraw: (time?: Time) => void): Db {
   const server = createServer(url, (updateId: number, payload: ArrayBuffer) => {
     switch (updateId) {
       case CheckboxToggled:
@@ -69,26 +45,73 @@ export function createDb(url: string, scheduleDraw: () => void): Db {
     }
   })
 
-  const pageCache = new LRUCache<PageNo, Page>({
+  class ClientPage extends Page {
+    constructor(private readonly page: PageNo) {
+      super()
+    }
+
+    toggle(offset: number, time: Time) {
+      super.toggle(offset, time)
+      scheduleDraw(time)
+    }
+
+    optimisticToggle(offset: number) {
+      this.doToggle(offset)
+
+      toggleOnServer(server, { page: this.page, offset })
+        .then((time: Time) => {
+          this.confirmToggle(time)
+          scheduleDraw(time)
+        })
+        .catch((error) => {
+          console.error('toggle error', error)
+          this.doToggle(offset)
+          scheduleDraw()
+        })
+    }
+  }
+
+  class ClientPersistentPage extends PersistentPage {
+    constructor(public readonly page: PageNo) {
+      super(new ClientPage(page))
+    }
+
+    optimisticToggle(offset: number) {
+      const transient = this.transient as ClientPage
+      transient.optimisticToggle(offset)
+    }
+  }
+
+  const pageCache = new LRUCache<PageNo, ClientPersistentPage>({
     max: 2,
-    dispose: (value, key) => {
+    dispose: (_, key) => {
       console.log('dispose', key)
     },
   })
+  const screenCache: (ClientPersistentPage | undefined)[] = [undefined, undefined]
 
-  function getPage(page: PageNo): Page {
+  function getCachedPage(page: PageNo): ClientPersistentPage | undefined {
+    const screen = screenCache[page & 1]
+    if (screen !== undefined) return screen
+
     const cached = pageCache.get(page)
-    if (cached !== undefined) return cached
+    if (cached !== undefined) {
+      screenCache[page & 1] = cached
+      return cached
+    }
 
-    const newPage = new PersistentPage(new ClientPage(page, server, scheduleDraw))
+    return undefined
+  }
+
+  function loadPage(page: PageNo): ClientPersistentPage {
+    const newPage = new ClientPersistentPage(page)
+    screenCache[page & 1] = newPage
     pageCache.set(page, newPage)
 
     server
       .sendCommand(encodeRequestPageData(page))
       .then((result) => {
         console.log('subscribed to', page, result)
-        // newPage.load(new Uint16Array(result))
-        // scheduleDraw()
       })
       .catch((error) => {
         console.error('error subscribing to', page, error)
@@ -97,7 +120,19 @@ export function createDb(url: string, scheduleDraw: () => void): Db {
     return newPage
   }
 
+  const getPage = (page: PageNo): ClientPersistentPage => getCachedPage(page) ?? loadPage(page)
+
   return {
     getPage,
+    getCheckbox(checkbox: Checkbox): number {
+      const cached = getCachedPage(checkbox.page)
+      if (cached) return cached.get(checkbox.offset)
+      loadPage(checkbox.page)
+      return 0
+    },
+    toggle(checkbox: Checkbox) {
+      const page = getPage(checkbox.page)
+      page.optimisticToggle(checkbox.offset)
+    },
   }
 }

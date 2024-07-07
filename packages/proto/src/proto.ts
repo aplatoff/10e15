@@ -24,7 +24,13 @@ export function encodeToggleCheckbox(checkbox: Checkbox): [id: number, payload: 
   return [ToggleCheckbox, payload.buffer]
 }
 
-export function decodeToggleCheckbox(payload: ArrayBuffer): Time {
+export function encodeToggleCheckboxResult(time: Time): ArrayBuffer {
+  const view = new DataView(new ArrayBuffer(8))
+  view.setBigUint64(0, time)
+  return view.buffer
+}
+
+export function decodeToggleCheckboxResult(payload: ArrayBuffer): Time {
   const view = new DataView(payload)
   return view.getBigUint64(0) as Time
 }

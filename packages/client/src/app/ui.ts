@@ -1,6 +1,6 @@
 //
 
-import { extractNo, TotalCheckboxes, type CheckboxNo } from 'model'
+import { extractNo, LastCheckbox, TotalCheckboxes, type CheckboxNo, type Time } from 'model'
 import { type Db } from './db'
 
 const numberFormat = new Intl.NumberFormat(navigator.language)
@@ -19,8 +19,8 @@ interface Presentation {
 export interface UI {
   makeLarger(): boolean
   makeSmaller(): boolean
-  goto(no: number): void
-  scheduleDraw(): void
+  goto(no: CheckboxNo): void
+  scheduleDraw(time?: Time): void
 }
 
 export function setupUI(
@@ -28,16 +28,17 @@ export function setupUI(
   wrapper: HTMLElement,
   canvas: HTMLCanvasElement,
   timeDiv: HTMLElement,
-  onRowChange?: (firstCheckbox: number) => void
+  onRowChange?: (firstCheckbox: CheckboxNo) => void
 ): UI {
   let cellSize = maxCellSize
-  let firstCheckbox = 0
+  let firstCheckbox = 0n as CheckboxNo
+  let lastKnownTime = 0n as Time
   let presentation: Presentation | null = null
   let animationFrameId: number | undefined
 
-  function scheduleDraw() {
-    const time = db.getTime()
-    timeDiv.textContent = numberFormat.format(Number(time))
+  function scheduleDraw(time?: Time) {
+    if (time && time > lastKnownTime) lastKnownTime = time
+    timeDiv.textContent = numberFormat.format(Number(lastKnownTime))
     if (animationFrameId === undefined) {
       animationFrameId = requestAnimationFrame(() => {
         presentation?.draw()
@@ -96,17 +97,18 @@ export function setupUI(
 
     const leftOffset = Math.max(16, cellSize) * 8
     const cols = Math.floor((width - leftOffset) / cellSize)
+    const nCols = BigInt(cols)
     const rows = Math.ceil(height / cellSize)
 
     let offsetPixels = 0 // vertical offset in pixels for smooth scrolling
 
     const checkboxFunction = cellSize <= 8 ? smallCheckbox : bigCheckbox
 
-    function eachRow(f: (firstCheckBoxInRow: number, row: number) => void) {
-      const firstRow = Math.floor(firstCheckbox / cols)
+    function eachRow(f: (firstCheckBoxInRow: CheckboxNo, row: number) => void) {
+      const firstRow = Number(firstCheckbox / nCols)
       for (let r = firstRow === 0 ? 0 : -1; r < rows; r++) {
         const row = firstRow + r
-        const rowStart = row * cols
+        const rowStart = (BigInt(row) * nCols) as CheckboxNo
         if (rowStart >= TotalCheckboxes) break
         f(rowStart, r)
       }
@@ -125,7 +127,7 @@ export function setupUI(
 
     function smallNumbers(ctx: CanvasRenderingContext2D) {
       ctx.fillStyle = 'black'
-      const firstRow = Math.floor(firstCheckbox / cols)
+      const firstRow = Number(firstCheckbox / nCols)
       const textRows = Math.floor(height / minFontSize)
       const rowsPerText = minFontSize / cellSize
       for (let r = 0; r < textRows; r++) {
@@ -147,8 +149,8 @@ export function setupUI(
         textFunction(ctx)
 
         eachRow((rowStart, r) => {
+          let checkboxNo = rowStart
           for (let c = 0; c < cols; c++) {
-            const checkboxNo = (rowStart + c) as CheckboxNo
             if (checkboxNo >= TotalCheckboxes) break
 
             const checkbox = extractNo(checkboxNo)
@@ -157,8 +159,9 @@ export function setupUI(
               leftOffset + c * cellSize,
               r * cellSize,
               cellSize,
-              db.get(checkbox) !== 0
+              db.getCheckbox(checkbox) !== 0
             )
+            checkboxNo++
           }
         })
 
@@ -170,12 +173,12 @@ export function setupUI(
         const sign = Math.sign(offsetPixels)
         const rowDelta = Math.floor(Math.abs(offsetPixels) / cellSize)
         if (rowDelta !== 0) {
-          firstCheckbox += sign * rowDelta * cols
-          if (firstCheckbox < 0) firstCheckbox = 0
+          firstCheckbox = (firstCheckbox + BigInt(sign * rowDelta * cols)) as CheckboxNo
+          if (firstCheckbox < 0) firstCheckbox = 0n as CheckboxNo
           onRowChange?.(firstCheckbox)
         }
         offsetPixels = sign * (Math.abs(offsetPixels) % cellSize)
-        if (firstCheckbox === 0 && offsetPixels <= 0) {
+        if (firstCheckbox === 0n && offsetPixels <= 0) {
           offsetPixels = 0
         }
       },
@@ -189,8 +192,8 @@ export function setupUI(
         const cy = Math.floor((y + offsetPixels) / cellSize)
 
         if (cx < cols && cx >= 0) {
-          const firstRow = Math.floor(firstCheckbox / cols)
-          const no = ((firstRow + cy) * cols + cx) as CheckboxNo
+          const firstRow = firstCheckbox / nCols
+          const no = ((firstRow + BigInt(cy)) * nCols + BigInt(cx)) as CheckboxNo
           const checkbox = extractNo(no)
           db.toggle(checkbox)
         }
@@ -211,8 +214,8 @@ export function setupUI(
       return cellSize === 4
     },
 
-    goto(no: number) {
-      firstCheckbox = no >= TotalCheckboxes ? TotalCheckboxes - 1 : no
+    goto(no: CheckboxNo) {
+      firstCheckbox = no >= TotalCheckboxes ? LastCheckbox : no
       presentation?.alignScroll()
       scheduleDraw()
     },

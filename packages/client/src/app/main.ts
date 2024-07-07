@@ -1,5 +1,6 @@
 //
 
+import { type CheckboxNo } from 'model'
 import { createDb } from './db'
 import { setupUI } from './ui'
 
@@ -26,7 +27,7 @@ gotoInput.addEventListener('input', (e: Event) => {
   const currentValue = (e.target as HTMLInputElement).value
   const value = currentValue === '' ? 0 : parseInt(currentValue, 10)
   if (isNaN(value) || value < 0) return
-  ui.goto(value)
+  ui.goto(BigInt(value) as CheckboxNo)
 })
 
 smallerButton.addEventListener('click', () => {

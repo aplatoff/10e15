@@ -2,7 +2,13 @@
 
 import type { ServerWebSocket } from 'bun'
 import type { PageNo } from 'model'
-import { encodeCheckboxToggled, encodeChunkData, errorResponse, resultResponse } from 'proto'
+import {
+  encodeCheckboxToggled,
+  encodeChunkData,
+  encodeToggleCheckboxResult,
+  errorResponse,
+  resultResponse,
+} from 'proto'
 import { createDb, dev, type Db } from './db'
 
 type ClientData = {}
@@ -29,7 +35,7 @@ async function handleToggleCheckbox(
   const pageNo = message.readUint32BE(4) as PageNo
   const time = await db.toggle(pageNo, offset)
   ws.publish(broadcastTopic, broadcast(encodeCheckboxToggled(pageNo, offset, time)))
-  return
+  return encodeToggleCheckboxResult(time)
 }
 
 async function handleRequestPageData(

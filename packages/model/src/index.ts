@@ -14,7 +14,8 @@ export type Checkbox = {
   offset: number
 }
 
-export const TotalCheckboxes = 1n * PB
+export const TotalCheckboxes = (1n * PB) as CheckboxNo
+export const LastCheckbox = (TotalCheckboxes - 1n) as CheckboxNo
 
 const PageSize = 512n * KB
 const CheckboxesPerByte = 8n

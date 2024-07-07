@@ -74,7 +74,7 @@ export class Page {
 }
 
 export class PersistentPage extends Page {
-  constructor(private transient: Page) {
+  constructor(protected transient: Page) {
     super()
   }
 
