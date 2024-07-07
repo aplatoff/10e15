@@ -38,6 +38,8 @@ document.addEventListener('keypress', (event) => {
   gotoInput.dispatchEvent(inputEvent)
 })
 
+window.onload = ui.updatePresentation
+
 smallerButton.addEventListener('click', () => {
   smallerButton.disabled = ui.makeSmaller()
   largerButton.disabled = false

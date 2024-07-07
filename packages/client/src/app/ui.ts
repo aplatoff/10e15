@@ -21,6 +21,7 @@ export interface UI {
   makeSmaller(): boolean
   goto(no: CheckboxNo): void
   scheduleDraw(time?: Time): void
+  updatePresentation(): void
 }
 
 export function setupUI(
@@ -51,9 +52,6 @@ export function setupUI(
     presentation = createPresentation()
     scheduleDraw()
   }
-
-  updatePresentation()
-  canvas.style.display = 'block'
 
   canvas.addEventListener('click', (event) => {
     event.preventDefault()
@@ -220,6 +218,7 @@ export function setupUI(
       scheduleDraw()
     },
     scheduleDraw,
+    updatePresentation,
   }
 }
 
