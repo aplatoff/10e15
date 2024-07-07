@@ -14,6 +14,7 @@ import {
   Page,
   PersistentPage,
 } from 'proto'
+import { config } from './config'
 import { createServer } from './server'
 import { type Server } from './types'
 
@@ -28,27 +29,24 @@ async function toggleOnServer(server: Server, checkbox: Checkbox): Promise<Time>
   return decodeToggleCheckboxResult(response)
 }
 
-export function createDb(host: string, scheduleDraw: (time?: Time) => void): Db {
-  const server = createServer(
-    `ws://${host}:3000/proto`,
-    (updateId: number, payload: ArrayBuffer) => {
-      switch (updateId) {
-        case CheckboxToggled:
-          const toggled = decodeCheckboxToggled(payload)
-          if (pageCache.has(toggled.page))
-            getPage(toggled.page).transient.toggle(toggled.offset, toggled.time)
-          scheduleDraw(toggled.time)
-          break
-        case ChunkData:
-          const data = decodeChunkData(payload)
-          getPage(data.page).transient.loadChunk(new Uint16Array(data.data), data.kind, data.chunk)
-          scheduleDraw()
-          break
-        default:
-          console.error('unknown update', updateId)
-      }
+export function createDb(scheduleDraw: (time?: Time) => void): Db {
+  const server = createServer(config.ws, (updateId: number, payload: ArrayBuffer) => {
+    switch (updateId) {
+      case CheckboxToggled:
+        const toggled = decodeCheckboxToggled(payload)
+        if (pageCache.has(toggled.page))
+          getPage(toggled.page).transient.toggle(toggled.offset, toggled.time)
+        scheduleDraw(toggled.time)
+        break
+      case ChunkData:
+        const data = decodeChunkData(payload)
+        getPage(data.page).transient.loadChunk(new Uint16Array(data.data), data.kind, data.chunk)
+        scheduleDraw()
+        break
+      default:
+        console.error('unknown update', updateId)
     }
-  )
+  })
 
   class ClientPage extends Page {
     constructor(private readonly page: PageNo) {
@@ -62,6 +60,7 @@ export function createDb(host: string, scheduleDraw: (time?: Time) => void): Db 
 
     optimisticToggle(offset: number) {
       this.doToggle(offset)
+      scheduleDraw()
 
       toggleOnServer(server, { page: this.page, offset })
         .then((time: Time) => {
@@ -75,8 +74,6 @@ export function createDb(host: string, scheduleDraw: (time?: Time) => void): Db 
         })
     }
   }
-
-  const pageServer = `http://${host}:8000`
 
   class ClientPersistentPage extends PersistentPage {
     public readonly transient: ClientPage
@@ -96,7 +93,7 @@ export function createDb(host: string, scheduleDraw: (time?: Time) => void): Db 
       const time = decodeRequestPageDataResult(response)
       if (this.getTime() !== time) {
         console.log('persistent page outdated', this.getTime(), time)
-        const url = `${pageServer}/${this.page}-${time}`
+        const url = `${config.http}/${this.page}-${time}`
         console.log('fetching persistent page', url)
         try {
           const response = await fetch(url)
