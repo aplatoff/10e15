@@ -1,7 +1,7 @@
 //
 
 import type { ServerWebSocket } from 'bun'
-import type { PageNo, Time } from 'model'
+import { extractNo, TotalCheckboxes, type PageNo, type Time } from 'model'
 import {
   encodeCheckboxToggled,
   encodeChunkData,
@@ -10,7 +10,7 @@ import {
   errorResponse,
   resultResponse,
 } from 'proto'
-import { createDb, dev, type Db } from './db'
+import { createDb, type Db } from './db'
 
 type ClientData = {}
 
@@ -55,23 +55,14 @@ async function handleRequestPageData(
 }
 
 const handlers = [handleToggleCheckbox, handleRequestPageData]
-const pagesPath = '/pages/'
-const pagesPathLength = pagesPath.length
 
 export function createServer() {
-  const db = createDb(dev, 0n as Time)
+  const db = createDb(0n as Time)
 
   const server = Bun.serve<ClientData>({
     fetch(req, server) {
       const url = new URL(req.url)
-      if (url.pathname.startsWith(pagesPath)) {
-        const pageCode = url.pathname.slice(pagesPathLength).split('-')
-        const page = Number(pageCode[0]) as PageNo
-        const time = BigInt(pageCode[1]) as Time
-        console.log(`serving page data ${page} with time ${time}`)
-
-        return new Response(db.getPage(pageNo))
-      } else if (url.pathname === '/proto') {
+      if (url.pathname === '/proto') {
         const success = server.upgrade(req, { data: {} })
         return success ? undefined : new Response('WebSocket upgrade error', { status: 400 })
       }
@@ -80,7 +71,9 @@ export function createServer() {
     websocket: {
       open(ws) {
         ws.subscribe(broadcastTopic)
-        console.log(`new connection`)
+        const time = db.getTime()
+        console.log(`new connection at `, time)
+        ws.send(broadcast(encodeCheckboxToggled(extractNo(TotalCheckboxes), time)))
       },
       async message(ws, message) {
         if (typeof message === 'string') {
@@ -104,5 +97,5 @@ export function createServer() {
     },
   })
 
-  console.log(`Listening on ${server.hostname}:${server.port}`)
+  console.log(`server listening on ${server.hostname}:${server.port}`)
 }

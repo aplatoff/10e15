@@ -35,7 +35,8 @@ export function createDb(host: string, scheduleDraw: (time?: Time) => void): Db 
       switch (updateId) {
         case CheckboxToggled:
           const toggled = decodeCheckboxToggled(payload)
-          getPage(toggled.page).transient.toggle(toggled.offset, toggled.time)
+          if (pageCache.has(toggled.page))
+            getPage(toggled.page).transient.toggle(toggled.offset, toggled.time)
           scheduleDraw(toggled.time)
           break
         case ChunkData:
@@ -75,7 +76,7 @@ export function createDb(host: string, scheduleDraw: (time?: Time) => void): Db 
     }
   }
 
-  const pageServer = `https://${host}:8000/pages/`
+  const pageServer = `http://${host}:8000`
 
   class ClientPersistentPage extends PersistentPage {
     public readonly transient: ClientPage
@@ -94,17 +95,18 @@ export function createDb(host: string, scheduleDraw: (time?: Time) => void): Db 
       const response = await server.sendCommand(encodeRequestPageData(this.page))
       const time = decodeRequestPageDataResult(response)
       if (this.getTime() !== time) {
-        console.error('persistent page outdated', this.getTime(), time)
-        const url = `${pageServer}${this.page}-${time}`
+        console.log('persistent page outdated', this.getTime(), time)
+        const url = `${pageServer}/${this.page}-${time}`
         console.log('fetching persistent page', url)
         try {
           const response = await fetch(url)
-          if (!response.ok) throw new Error(`Response status: ${response.status}`)
-          this.loadFromBuffer(await response.arrayBuffer())
+          if (response.ok) this.loadFromBuffer(time, await response.arrayBuffer())
+          else console.error('fetch failed', response.status, response.statusText)
         } catch (error) {
           console.error(error)
         }
       }
+      scheduleDraw()
     }
   }
 

@@ -131,8 +131,9 @@ export function createTxStorage(capacity: number): TxStorage {
     },
     load: (buf: Uint16Array) => {
       size = buf[0]
+      console.log('load txes', buf.length, size)
       data = new Uint16Array(size)
-      data.set(buf.subarray(1))
+      data.set(buf.subarray(1, size + 1))
       return (size + 1) << 1
     },
     optimize: () => {
@@ -146,84 +147,3 @@ export function createTxStorage(capacity: number): TxStorage {
   }
   return txes
 }
-
-// const ChunksPerPage = CheckboxesPerPage >> 16
-
-// export function createTransientPage(): TransientPage {
-//   let globalTime = 0n
-//   const chunks = new Array<Chunk | undefined>(ChunksPerPage)
-
-//   const getChunk = (n: number): Chunk => {
-//     const chunk = chunks[n]
-//     if (chunk) return chunk
-//     const newChunk = createTxStorage(4)
-//     chunks[n] = newChunk
-//     return newChunk
-//   }
-
-//   const saveChunk = (chunk: Chunk): ArrayBufferLike => {
-//     const optimized = chunk.optimize()
-//     const data = optimized.save()
-//     const size = data.byteLength >>> 1
-//     const buf = new Uint16Array(size + 1)
-//     buf[0] = optimized.kind()
-//     buf.set(new Uint16Array(data), 1)
-//     return buf.buffer
-//   }
-
-//   return {
-//     getTime: () => globalTime,
-//     toggle(offset: number, time: bigint) {
-//       const n = offset >> 16
-//       let chunk = getChunk(n)
-//       if (chunk.kind === 'txes') {
-//         const txes = chunk as TxStorage
-//         if (txes.isFull()) {
-//           const bitmap = txes.toBitmap()
-//           const size = bitmap.ones()
-//           chunk = size > 1024 ? bitmap : bitmap.toTxStorage(size << 1)
-//           chunks[n] = chunk
-//         }
-//       }
-//       if (globalTime < time) globalTime = time
-//       else if (time !== 0n) console.log('global time in the past', globalTime, time)
-//       chunk.toggle(offset & 0xffff)
-//     },
-//     get: (offset: number): number => chunks[offset >>> 16]?.get(offset & 0xffff) ?? 0,
-//     save: (sink: (data: ArrayBufferLike, n: number) => void) =>
-//       chunks.forEach((chunk, i) => {
-//         if (chunk) sink(saveChunk(chunk), i)
-//       }),
-//     loadChunk: (buf: ArrayBufferLike, n: number) => {
-//       const data = new Uint16Array(buf)
-//       const type = data[0]
-//       const chunk = type === 0 ? createBitmap() : createTxStorage(0)
-//       chunk.load(new Uint16Array(data.buffer, 2))
-//       chunks[n] = chunk
-//     },
-//     mergeChunk: (bitmapData: Uint16Array, n: number) => {
-//       const chunk = chunks[n]
-//       chunks[n] = chunk
-//         ? mergeBitmapData(chunk.toBitmap().toBitmapData(), bitmapData)
-//         : createBitmapFromData(bitmapData).optimize()
-//     },
-//   }
-// }
-
-// export function createPersistentPage(): Page {
-//   let transient = createTransientPage()
-//   let persistent = createTransientPage()
-
-//   return {
-//     getTime: () => persistent.getTime(),
-//     toggle(offset: number, time: bigint) {
-//       transient.toggle(offset, time)
-//     },
-//     get: (offset: number): number => transient.get(offset) ^ persistent.get(offset),
-//     save: (sink: (data: ArrayBufferLike, n: number) => void) => {
-//       if (transient.getTime() !== 0n) {
-//         persistent.setTime(transient.getTime())
-//       }
-//     },
-//   }
-// }

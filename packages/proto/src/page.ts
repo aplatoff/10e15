@@ -95,15 +95,17 @@ export class PersistentPage extends Page {
     this.setTime(page.getTime())
   }
 
-  public loadFromBuffer(buffer: ArrayBuffer) {
+  public loadFromBuffer(time: Time, buffer: ArrayBuffer) {
+    console.log('loading page from buffer', buffer.byteLength, 'bytes')
     const view = new DataView(buffer)
     let offset = 0
     while (true) {
-      const n = view.getUint8(offset)
+      const n = view.getUint8(offset++)
       if (n === 0xff) break
-      const kind = view.getUint8(offset + 1)
-      offset += 2
-      offset += this.loadChunk(new Uint16Array(buffer, offset, n), kind as ChunkKind, n)
+      const kind = view.getUint8(offset++)
+      console.log('loading chunk', n, 'kind', kind)
+      offset += this.loadChunk(new Uint16Array(buffer, offset), kind as ChunkKind, n)
     }
+    this.setTime(time)
   }
 }

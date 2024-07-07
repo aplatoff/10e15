@@ -26,12 +26,6 @@ export function createServer(
         break
       default:
         onUpdate(tag, buffer.slice(1))
-        // const request = decodeRequest(buffer)
-        // if (request.method === toggle.code) {
-        //   // TODO type handling
-        //   const checkbox = request.params[0] as Checkbox
-        //   db.toggle(checkbox)
-        // }
         break
     }
   })
