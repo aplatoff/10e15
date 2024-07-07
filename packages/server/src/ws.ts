@@ -1,10 +1,11 @@
 //
 
 import type { ServerWebSocket } from 'bun'
-import type { PageNo } from 'model'
+import type { PageNo, Time } from 'model'
 import {
   encodeCheckboxToggled,
   encodeChunkData,
+  encodeRequestPageDataResult,
   encodeToggleCheckboxResult,
   errorResponse,
   resultResponse,
@@ -32,9 +33,10 @@ async function handleToggleCheckbox(
   message: Buffer
 ): Promise<ArrayBuffer | undefined> {
   const offset = message.readUint32BE(0)
-  const pageNo = message.readUint32BE(4) as PageNo
-  const time = await db.toggle(pageNo, offset)
-  ws.publish(broadcastTopic, broadcast(encodeCheckboxToggled(pageNo, offset, time)))
+  const page = message.readUint32BE(4) as PageNo
+  const checkbox = { page, offset }
+  const time = await db.toggle(checkbox)
+  ws.publish(broadcastTopic, broadcast(encodeCheckboxToggled(checkbox, time)))
   return encodeToggleCheckboxResult(time)
 }
 
@@ -44,16 +46,18 @@ async function handleRequestPageData(
   message: Buffer
 ): Promise<ArrayBuffer | undefined> {
   const pageNo = message.readUint32BE(0) as PageNo
-  await db.save(pageNo, (data, kind, chunk) =>
+  console.log(`requesting page ${pageNo}`)
+  const persistentTime = await db.requestChunkData(pageNo, (data, kind, chunk) => {
+    console.log('sending transient chunk', chunk, 'of kind', kind, ', page', pageNo, 'to client')
     ws.send(broadcast(encodeChunkData(pageNo, chunk, kind, data)))
-  )
-  return
+  })
+  return encodeRequestPageDataResult(persistentTime)
 }
 
 const handlers = [handleToggleCheckbox, handleRequestPageData]
 
 export function createServer() {
-  const db = createDb(dev, BigInt(0))
+  const db = createDb(dev, 0n as Time)
 
   const server = Bun.serve<ClientData>({
     fetch(req, server) {

@@ -1,7 +1,7 @@
 //
 
 import { LRUCache } from 'lru-cache'
-import type { PageNo, Time } from 'model'
+import type { Checkbox, PageNo, Time } from 'model'
 import { Page, PersistentPage, type ChunkKind } from 'proto'
 
 type Config = {
@@ -40,19 +40,30 @@ export const dev: Config = {
 }
 
 export interface Db {
-  toggle(page: PageNo, offset: number): Promise<Time>
-  save(
+  toggle(checkbox: Checkbox): Promise<Time>
+  requestChunkData(
     page: PageNo,
     send: (data: ArrayBufferLike, kind: ChunkKind, chunk: number) => void
-  ): Promise<void>
+  ): Promise<Time>
 }
 
 const name = (value: number, pad: number) => value.toString(16).padStart(pad, '0')
 
-export function createDb(config: Config, time: bigint): Db {
+class ServerPersistentPage extends PersistentPage {
+  constructor() {
+    super(new Page())
+  }
+  async sendTransientData(
+    send: (data: ArrayBufferLike, kind: ChunkKind, chunk: number) => void
+  ): Promise<void> {
+    this.transient.optimize((chunk, n) => send(chunk.save().buffer, chunk.kind(), n))
+  }
+}
+
+export function createDb(config: Config, time: Time): Db {
   let globalTime = time
 
-  const pages = new LRUCache<PageNo, PersistentPage>({
+  const pages = new LRUCache<PageNo, ServerPersistentPage>({
     max: 2,
     dispose: (page, key) => {
       console.log('save page', key, 'to', getPath(key))
@@ -72,20 +83,20 @@ export function createDb(config: Config, time: bigint): Db {
     return `${config.paths[drive]}/${name(root, 2)}/${name(subfolder, 2)}/${name(file, 3)}`
   }
 
-  async function loadPersistentPage(pageNo: PageNo): Promise<PersistentPage> {
+  async function loadPersistentPage(pageNo: PageNo): Promise<ServerPersistentPage> {
     const path = getPath(pageNo)
     console.log('path', pageNo, path)
 
     const meta = Bun.file(`${path}.meta`)
     const exists = await meta.exists()
     if (!exists) {
-      return new PersistentPage(new Page())
+      return new ServerPersistentPage()
     }
 
     throw new Error('Not implemented')
   }
 
-  async function getPage(pageNo: PageNo): Promise<PersistentPage> {
+  async function getPage(pageNo: PageNo): Promise<ServerPersistentPage> {
     const page = pages.get(pageNo)
     if (page === undefined) {
       const page = await loadPersistentPage(pageNo)
@@ -96,19 +107,21 @@ export function createDb(config: Config, time: bigint): Db {
   }
 
   return {
-    async toggle(pageNo: PageNo, offset: number): Promise<Time> {
-      const page = await getPage(pageNo)
-      globalTime = globalTime + 1n
-      page.toggle(offset, globalTime)
+    async toggle(checkbox: Checkbox): Promise<Time> {
+      const page = await getPage(checkbox.page)
+      globalTime = (globalTime + 1n) as Time
+      page.toggle(checkbox.offset, globalTime)
       console.log('time', globalTime)
       return globalTime as Time
     },
-    async save(
+    async requestChunkData(
       pageNo: PageNo,
       send: (data: ArrayBufferLike, kind: ChunkKind, chunk: number) => void
-    ): Promise<void> {
+    ): Promise<Time> {
       const page = await getPage(pageNo)
-      page.optimize((chunk, n) => send(chunk.save().buffer, chunk.kind(), n))
+      const time = page.getTime()
+      page.sendTransientData(send)
+      return time
     },
   }
 }

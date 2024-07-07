@@ -24,6 +24,16 @@ export function encodeToggleCheckbox(checkbox: Checkbox): [id: number, payload: 
   return [ToggleCheckbox, payload.buffer]
 }
 
+// not used, dealing with Buffer on server now
+export function decodeToggleCheckbox(payload: ArrayBufferLike): Checkbox {
+  const view = new DataView(payload)
+  const checkbox = {
+    offset: view.getUint32(0),
+    page: view.getUint32(4) as PageNo,
+  }
+  return checkbox
+}
+
 export function encodeToggleCheckboxResult(time: Time): ArrayBuffer {
   const view = new DataView(new ArrayBuffer(8))
   view.setBigUint64(0, time)
@@ -35,22 +45,34 @@ export function decodeToggleCheckboxResult(payload: ArrayBuffer): Time {
   return view.getBigUint64(0) as Time
 }
 
+///
+
 export function encodeRequestPageData(page: PageNo): [id: number, payload: ArrayBufferLike] {
   const payload = new DataView(new ArrayBuffer(4))
   payload.setUint32(0, page)
   return [RequestPageData, payload.buffer]
 }
 
+export function encodeRequestPageDataResult(time: Time): ArrayBuffer {
+  const view = new DataView(new ArrayBuffer(8))
+  view.setBigUint64(0, time)
+  return view.buffer
+}
+
+export function decodeRequestPageDataResult(payload: ArrayBuffer): Time {
+  const view = new DataView(payload)
+  return view.getBigUint64(0) as Time
+}
+
 // B R O A D C A S T S
 
 export function encodeCheckboxToggled(
-  page: PageNo,
-  offset: number,
+  checkbox: Checkbox,
   time: bigint
 ): [id: number, ArrayBufferLike] {
   const broadcast = new DataView(new ArrayBuffer(16))
-  broadcast.setUint32(0, offset)
-  broadcast.setUint32(4, page)
+  broadcast.setUint32(0, checkbox.offset)
+  broadcast.setUint32(4, checkbox.page)
   broadcast.setBigUint64(8, time)
   return [CheckboxToggled, broadcast.buffer]
 }
