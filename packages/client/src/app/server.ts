@@ -39,10 +39,11 @@ export function createServer(
   let lastId = 0
 
   return {
-    sendCommand: (commandId: number, payload: ArrayBuffer): Promise<ArrayBuffer> => {
+    sendCommand: (command: [number, ArrayBuffer]): Promise<ArrayBuffer> => {
       const id = ++lastId
+      const payload = command[1]
       const message = new Uint8Array(payload.byteLength + 4)
-      message[0] = commandId
+      message[0] = command[0]
       message[1] = id >>> 16
       message[2] = id >>> 8
       message[3] = id

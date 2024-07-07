@@ -1,28 +1,32 @@
 //
 
-// const KB = 10
-const MB = 20
-const GB = 30
-// const TB = 40
-// const PB = 50
+const KB = 1024n
+const MB = KB * KB
+const GB = KB * MB
+const TB = KB * GB
+const PB = KB * TB
 
-export type CheckboxNo = number & { __tag: 'checkbox' }
+export type Time = bigint & { __tag: 'time' }
+export type CheckboxNo = bigint & { __tag: 'checkbox' }
 export type PageNo = number & { __tag: 'page' }
 export type Checkbox = {
   page: PageNo
   offset: number
 }
 
-export const TotalCheckboxes = ((1 << GB) * (1 << MB)) as CheckboxNo // JS limit shifts to 32 bits
-export const CheckboxesPerPageBits = MB + 2 // 4 million checkboxes per page
-export const CheckboxesPerPage = 1 << CheckboxesPerPageBits
+export const TotalCheckboxes = 1n * PB
+
+const PageSize = 512n * KB
+const CheckboxesPerByte = 8n
+export const CheckboxesPerPage = CheckboxesPerByte * PageSize
+const LastCheckboxInPage = CheckboxesPerPage - 1n
 
 // Bitwise operations in JS are complicated with anything larger than 32 bits
 export const extractNo = (checkboxNo: CheckboxNo): Checkbox => ({
-  page: ((checkboxNo / CheckboxesPerPage) | 0) as PageNo,
-  offset: checkboxNo & (CheckboxesPerPage - 1),
+  page: Number(checkboxNo / CheckboxesPerPage) as PageNo,
+  offset: Number(checkboxNo & LastCheckboxInPage),
 })
 
-export const MaxPageNo = extractNo(TotalCheckboxes).page
+export const MaxPageNo = extractNo(TotalCheckboxes as CheckboxNo).page
 
 console.log('MaxPageNo', MaxPageNo.toString(16))

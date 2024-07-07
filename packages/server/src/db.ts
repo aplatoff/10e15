@@ -1,7 +1,8 @@
 //
 
+import { LRUCache } from 'lru-cache'
 import type { PageNo } from 'model'
-import { type Page, createPage } from 'proto'
+import { Page, PersistentPage, type ChunkKind } from 'proto'
 
 type Config = {
   driveBits: number
@@ -32,76 +33,82 @@ export const production: Config = {
   memory: 64 * 1024, // MB
 }
 
-enum PageState {
-  Empty,
-}
-
-type PageDescriptor = {
-  state: PageState
-  transient: Page
+export const dev: Config = {
+  driveBits: 0,
+  paths: ['/tmp'],
+  memory: 1 * 1024, // MB
 }
 
 export interface Db {
-  // getPage(page: PageNo): Promise<Page>
-  toggle(page: PageNo, offset: number): Promise<bigint> // queue in the future
-  save(pageNo: PageNo, sink: (data: ArrayBufferLike, chunk: number) => void): Promise<void>
+  toggle(page: PageNo, offset: number): Promise<bigint>
+  save(
+    page: PageNo,
+    send: (data: ArrayBufferLike, kind: ChunkKind, chunk: number) => void
+  ): Promise<void>
 }
 
 const name = (value: number, pad: number) => value.toString(16).padStart(pad, '0')
 
-export function createDb(config: Config, time: BigInt): Db {
+export function createDb(config: Config, time: bigint): Db {
   let globalTime = time
 
-  const pages = new Map<PageNo, PageDescriptor>()
+  const pages = new LRUCache<PageNo, PersistentPage>({
+    max: 2,
+    dispose: (page, key) => {
+      console.log('save page', key, 'to', getPath(key))
+      page.optimize((chunk, n) => {
+        console.log('save chunk', n, chunk.kind())
+      })
+    },
+  })
 
-  async function createPageDescriptor(pageNo: PageNo): Promise<PageDescriptor> {
+  function getPath(pageNo: PageNo) {
     const drive = pageNo & ((1 << config.driveBits) - 1)
     const fileNo = pageNo >>> config.driveBits
     const root = fileNo & 0xff
     const subfolder = (root >>> 8) & 0xff
     const file = fileNo >>> 16
 
-    const path = `${config.paths[drive]}/${name(root, 2)}/${name(subfolder, 2)}/${name(file, 2)}`
+    return `${config.paths[drive]}/${name(root, 2)}/${name(subfolder, 2)}/${name(file, 3)}`
+  }
+
+  async function loadPersistentPage(pageNo: PageNo): Promise<PersistentPage> {
+    const path = getPath(pageNo)
     console.log('path', pageNo, path)
 
     const meta = Bun.file(`${path}.meta`)
     const exists = await meta.exists()
     if (!exists) {
-      return {
-        state: PageState.Empty,
-        transient: createPage(),
-      }
+      return new PersistentPage(new Page())
     }
 
     throw new Error('Not implemented')
   }
 
-  async function getPage(page: PageNo): Promise<PageDescriptor> {
-    const desc = pages.get(page)
-    if (desc === undefined) {
-      const desc = await createPageDescriptor(page)
-      pages.set(page, desc)
-      return desc
+  async function getPage(pageNo: PageNo): Promise<PersistentPage> {
+    const page = pages.get(pageNo)
+    if (page === undefined) {
+      const page = await loadPersistentPage(pageNo)
+      pages.set(pageNo, page)
+      return page
     }
-    return desc
+    return page
   }
 
   return {
-    // getPage: async (pageNo: PageNo): Promise<Page> => (await getPage(pageNo)).transient,
     async toggle(pageNo: PageNo, offset: number): Promise<bigint> {
       const page = await getPage(pageNo)
-      page.transient.toggle(offset)
-      globalTime = globalTime + BigInt(1)
+      globalTime = globalTime + 1n
+      page.toggle(offset, globalTime)
       console.log('time', globalTime)
       return globalTime
     },
     async save(
       pageNo: PageNo,
-      sink: (data: ArrayBufferLike, chunk: number) => void
+      send: (data: ArrayBufferLike, kind: ChunkKind, chunk: number) => void
     ): Promise<void> {
-      const desc = await getPage(pageNo)
-      const page = desc.transient
-      page.save(sink)
+      const page = await getPage(pageNo)
+      page.optimize((chunk, n) => send(chunk.save().buffer, chunk.kind(), n))
     },
   }
 }

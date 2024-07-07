@@ -2,8 +2,8 @@
 
 import type { ServerWebSocket } from 'bun'
 import type { PageNo } from 'model'
-import { broadcastCheckboxToggled, broadcastChunkData, errorResponse, resultResponse } from 'proto'
-import { createDb, production, type Db } from './db'
+import { encodeCheckboxToggled, encodeChunkData, errorResponse, resultResponse } from 'proto'
+import { createDb, dev, type Db } from './db'
 
 type ClientData = {}
 
@@ -11,6 +11,14 @@ const welcomeMessage =
   'Welcome to the 10e15 checkboxes server!\nDid you tried our flagship product https://huly.io?\nAnd we are always hiring, check more at https://hardcoreeng.com'
 
 const broadcastTopic = 'everyone'
+
+const broadcast = (data: [id: number, payload: ArrayBufferLike]): ArrayBufferLike => {
+  const payload = new Uint8Array(data[1])
+  const buf = new Uint8Array(new ArrayBuffer(1 + payload.length))
+  buf[0] = data[0]
+  buf.set(payload, 1)
+  return buf.buffer
+}
 
 async function handleToggleCheckbox(
   ws: ServerWebSocket<ClientData>,
@@ -20,7 +28,7 @@ async function handleToggleCheckbox(
   const offset = message.readUint32BE(0)
   const pageNo = message.readUint32BE(4) as PageNo
   const time = await db.toggle(pageNo, offset)
-  ws.publish(broadcastTopic, broadcastCheckboxToggled(pageNo, offset, time))
+  ws.publish(broadcastTopic, broadcast(encodeCheckboxToggled(pageNo, offset, time)))
   return
 }
 
@@ -30,14 +38,16 @@ async function handleRequestPageData(
   message: Buffer
 ): Promise<ArrayBuffer | undefined> {
   const pageNo = message.readUint32BE(0) as PageNo
-  await db.save(pageNo, (data, chunk) => ws.send(broadcastChunkData(pageNo, chunk, data)))
+  await db.save(pageNo, (data, kind, chunk) =>
+    ws.send(broadcast(encodeChunkData(pageNo, chunk, kind, data)))
+  )
   return
 }
 
 const handlers = [handleToggleCheckbox, handleRequestPageData]
 
 export function createServer() {
-  const db = createDb(production, BigInt(0))
+  const db = createDb(dev, BigInt(0))
 
   const server = Bun.serve<ClientData>({
     fetch(req, server) {
