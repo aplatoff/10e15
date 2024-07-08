@@ -8,6 +8,9 @@ const cors = {
   'Access-Control-Allow-Headers': 'Content-Type',
 }
 
+const prefix = '/pages/'
+const prefixLength = prefix.length
+
 function createServer(port: number) {
   const server = Bun.serve({
     fetch(req) {
@@ -16,7 +19,8 @@ function createServer(port: number) {
       }
       try {
         const url = new URL(req.url)
-        const pageId = url.pathname.slice(1)
+        if (!url.pathname.startsWith(prefix)) return new Response('Not found', { status: 404 })
+        const pageId = url.pathname.slice(prefixLength)
         const pageCode = pageId.split('-')
         const page = Number(pageCode[0]) as PageNo
         //const time = BigInt(pageCode[1]) as Time
@@ -35,9 +39,10 @@ function createServer(port: number) {
         return new Response('Not found', { status: 404 })
       }
     },
+    port,
   })
   return server
 }
 
-const server = createServer(8080)
+const server = createServer(8000)
 console.log(`server running on port ${server.port}`)
