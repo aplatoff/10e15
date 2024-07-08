@@ -73,6 +73,64 @@ export function setupUI(
     { passive: false }
   )
 
+  // TOUCH EVENTS
+  //
+
+  // let lastTouchEnd = 0
+  // let lastTouchDistance = 0
+  let isDragging = false
+  // let lastTouchX = 0
+  let lastTouchY = 0
+
+  canvas.addEventListener('touchstart', function (event) {
+    if (event.touches.length === 1) {
+      isDragging = true
+      // lastTouchX = event.touches[0].clientX
+      lastTouchY = event.touches[0].clientY
+    } else if (event.touches.length === 2) {
+      // lastTouchDistance = Math.hypot(
+      //   event.touches[0].clientX - event.touches[1].clientX,
+      //   event.touches[0].clientY - event.touches[1].clientY
+      // )
+    }
+  })
+
+  canvas.addEventListener('touchmove', function (event) {
+    if (event.touches.length === 1 && isDragging) {
+      // let deltaX = event.touches[0].clientX - lastTouchX
+      let deltaY = lastTouchY - event.touches[0].clientY
+
+      presentation?.scroll(deltaY)
+      scheduleDraw()
+
+      // lastTouchX = event.touches[0].clientX
+      lastTouchY = event.touches[0].clientY
+    } else if (event.touches.length === 2) {
+      // let touchDistance = Math.hypot(
+      //   event.touches[0].clientX - event.touches[1].clientX,
+      //   event.touches[0].clientY - event.touches[1].clientY
+      // )
+      // let scale = touchDistance / lastTouchDistance
+      // lastTouchDistance = touchDistance
+    }
+  })
+
+  canvas.addEventListener('touchend', (event) => {
+    if (event.touches.length === 0) {
+      isDragging = false
+    }
+    // if (event.touches.length < 2) {
+    //   lastTouchDistance = 0
+    // }
+  })
+
+  canvas.addEventListener('touchcancel', () => {
+    isDragging = false
+    // lastTouchDistance = 0
+  })
+
+  ///
+
   window.addEventListener('resize', () => {
     updatePresentation()
   })
