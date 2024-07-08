@@ -13,52 +13,153 @@
 
     <title>1,000,000,000,000,000 Checkboxes</title>
     <style>
-      body {
+      * {
         margin: 0;
         padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        height: 100%;
         font-family: 'JetBrains Mono', monospace;
         user-select: none;
+        font-size: 14px;
+      }
+
+      a,
+      input,
+      button {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 14px;
+      }
+
+      .page-container {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
       }
 
       header {
         width: 100%;
-        height: 80px;
+        padding: 1rem;
         background-color: #f5f5f5;
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.25);
         display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .header {
+        display: flex;
         align-items: center;
-        gap: 1rem;
+        justify-content: space-between;
+        gap: 16px;
       }
 
-      header .title {
-        font-size: 20px;
-        padding-left: 16px;
+      /* @media (max-width: 900px) {
+        header {
+          flex-direction: column;
+        }
+      } */
+
+      .header .controls {
+        display: flex;
+        align-items: center;
+        gap: 16px;
       }
 
-      #canvas-wrapper {
+      .controls .title {
+        font-size: 16px;
+      }
+
+      .header .info {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .links {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 11px;
+      }
+
+      .links a {
+        color: inherit;
+        font-size: 11px;
+        font-weight: 600;
+        white-space: nowrap;
+        text-decoration: none;
+        border-bottom: 1px dashed;
+      }
+
+      main {
+        flex: 1; /* Takes up the remaining space */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .github {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      /* #canvas-wrapper {
         width: 100%;
         height: calc(100vh - 80px);
         overflow: auto;
         position: relative;
         -webkit-overflow-scrolling: touch;
-      }
+      } */
 
       canvas {
         position: absolute;
+      }
+
+      .footer {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-top: 1px solid #ddd;
       }
     </style>
     <script type="module" src="src/app/main.ts"></script>
   </head>
   <body>
-    <header>
-      <div class="title">One Quadrillion Checkboxes</div>
-      <input type="text" id="goto" placeholder="Goto checkbox..." />
-      <button id="smaller">Smaller</button>
-      <button id="larger" disabled>Larger</button>
-      <div>Clicks: <span id="time">0</span></div>
-    </header>
-    <div id="canvas-wrapper">
-      <canvas id="checkboxes" />
+    <div class="page-container">
+      <header>
+        <div class="header">
+          <div class="controls">
+            <div class="title">One Quadrillion Checkboxes</div>
+            <input type="text" id="goto" placeholder="Goto checkbox..." />
+            <button id="smaller">Smaller</button>
+            <button id="larger" disabled>Larger</button>
+          </div>
+          <div class="info">
+            <div>Clicks:&nbsp;<span id="time">0</span></div>
+          </div>
+        </div>
+        <div class="links">
+          <div class="github">
+            <img src="src/assets/github.svg" alt="GitHub Logo" />
+            <p>GitHub</p>
+            <a href="https://github.com/aplatoff/10e15">aplatoff/10e15</a>
+          </div>
+          <div class="huly">
+            Made with
+            <a href="https://huly.io"
+              ><span><img src="src/assets/huly-logo.svg" alt="Huly Logo" /></span>Huly</a
+            ><sup>&reg;</sup>
+          </div>
+        </div>
+      </header>
+      <main id="canvas-wrapper">
+        <canvas id="checkboxes" />
+      </main>
+      <footer></footer>
     </div>
   </body>
 </html>
