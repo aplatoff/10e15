@@ -10,6 +10,11 @@ const RequestPageData = 0x01
 // U P D A T E S
 export const CheckboxToggled = 0x80
 export const ChunkData = 0x81
+export const GlobalTime = 0x82
+
+// P I N G
+
+export const Ping = 0xef
 
 // R E S P O N S E S
 export const ResultResponse = 0xfe
@@ -113,6 +118,17 @@ export function decodeChunkData(payload: ArrayBuffer): {
   const kind = view.getUint8(5) as ChunkKind
   const data = payload.slice(6)
   return { page, chunk, kind, data }
+}
+
+export function encodeGlobalTime(time: Time): [number, ArrayBuffer] {
+  const view = new DataView(new ArrayBuffer(8))
+  view.setBigUint64(0, time)
+  return [GlobalTime, view.buffer]
+}
+
+export function decodeGlobalTime(payload: ArrayBuffer): Time {
+  const view = new DataView(payload)
+  return view.getBigUint64(0) as Time
 }
 
 // R E S P O N S E S

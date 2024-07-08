@@ -1,5 +1,7 @@
 //
 
+import { Ping } from './proto'
+
 export const createClient = (url: string) => {
   const queue: ArrayBufferLike[] = []
   const listeners: ((buf: ArrayBuffer) => void)[] = []
@@ -26,7 +28,7 @@ export const createClient = (url: string) => {
   }
 
   function scheduleReconnect() {
-    const timeout = 1000
+    const timeout = 10000
     console.log(`Attempting to reconnect in ${timeout / 1000} seconds...`)
     setTimeout(() => {
       console.log('Reconnecting...')
@@ -44,13 +46,22 @@ export const createClient = (url: string) => {
     }
   }
 
+  function postRequest(buffer: ArrayBufferLike) {
+    queue.push(buffer)
+    processQueue()
+  }
+
+  setInterval(async () => {
+    if (ws && ws.readyState === ws.OPEN) {
+      console.log('ping...')
+      postRequest(new Uint8Array([Ping]).buffer)
+    }
+  }, 30000)
+
   initWebSocket()
 
   return {
-    postRequest(buffer: ArrayBufferLike) {
-      queue.push(buffer)
-      processQueue()
-    },
+    postRequest,
     addListener(listener: (buf: ArrayBuffer) => void) {
       listeners.push(listener)
     },

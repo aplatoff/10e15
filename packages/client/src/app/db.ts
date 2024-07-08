@@ -7,10 +7,12 @@ import {
   ChunkData,
   decodeCheckboxToggled,
   decodeChunkData,
+  decodeGlobalTime,
   decodeRequestPageDataResult,
   decodeToggleCheckboxResult,
   encodeRequestPageData,
   encodeToggleCheckbox,
+  GlobalTime,
   Page,
   PersistentPage,
 } from 'proto'
@@ -32,6 +34,10 @@ async function toggleOnServer(server: Server, checkbox: Checkbox): Promise<Time>
 export function createDb(scheduleDraw: (time?: Time) => void): Db {
   const server = createServer(config.ws, (updateId: number, payload: ArrayBuffer) => {
     switch (updateId) {
+      case GlobalTime:
+        const time = decodeGlobalTime(payload)
+        scheduleDraw(time)
+        break
       case CheckboxToggled:
         const toggled = decodeCheckboxToggled(payload)
         if (pageCache.has(toggled.page))

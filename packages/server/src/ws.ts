@@ -5,9 +5,11 @@ import { extractNo, TotalCheckboxes, type PageNo, type Time } from 'model'
 import {
   encodeCheckboxToggled,
   encodeChunkData,
+  encodeGlobalTime,
   encodeRequestPageDataResult,
   encodeToggleCheckboxResult,
   errorResponse,
+  Ping,
   resultResponse,
 } from 'proto'
 import { createDb, type Db } from './db'
@@ -80,6 +82,10 @@ export function createServer() {
           console.log(`received message: ${message}`)
         } else {
           const commandId = message.readUInt8(0)
+          if (commandId === Ping) {
+            ws.send(broadcast(encodeGlobalTime(db.getTime())))
+            return
+          }
           const requestId = (message.readUInt8(1) << 16) | message.readUint16BE(2)
           if (commandId < 0 && commandId >= handlers.length) return
           try {
