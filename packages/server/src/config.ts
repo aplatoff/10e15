@@ -12,7 +12,7 @@ export type Config = {
 const production: Config = {
   drives: 1,
   paths: [
-    '/home/andrey',
+    '/home/andrey/db',
     // '/mnt/disk0',
     // '/mnt/disk1',
     // '/mnt/disk2',
