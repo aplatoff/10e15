@@ -96,6 +96,7 @@ export function setupUI(
   })
 
   canvas.addEventListener('touchmove', function (event) {
+    event.preventDefault()
     if (event.touches.length === 1 && isDragging) {
       // let deltaX = event.touches[0].clientX - lastTouchX
       let deltaY = lastTouchY - event.touches[0].clientY
