@@ -108,7 +108,7 @@ export function createDb(scheduleDraw: (time?: Time) => void): Db {
   }
 
   const pageCache = new LRUCache<PageNo, ClientPersistentPage>({
-    max: 2,
+    max: 256,
     dispose: (_, key) => {
       console.log('dispose', key)
     },

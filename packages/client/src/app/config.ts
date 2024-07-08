@@ -1,8 +1,8 @@
 //
 
 const production = {
-  ws: 'wss://checkboxes.onequadrillion.com:3000/proto',
-  http: 'https://checkboxes.onequadrillion.com:8000',
+  ws: 'wss://checkboxes.onequadrillion.com/proto',
+  http: 'https://checkboxes.onequadrillion.com/pages',
 }
 
 const development = {
