@@ -35,7 +35,6 @@ function createServer(port: number) {
         return new Response('Not found', { status: 404 })
       }
     },
-    port,
   })
   return server
 }
