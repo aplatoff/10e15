@@ -20,7 +20,9 @@ const canvas = document.getElementById('checkboxes') as HTMLCanvasElement
 const time = document.getElementById('time') as HTMLElement
 
 const ui = setupUI(db, wrapper, canvas, time, (firstCheckbox) => {
-  gotoInput.value = firstCheckbox.toString()
+  const str = firstCheckbox.toString()
+  gotoInput.value = str
+  window.location.hash = str
 })
 
 gotoInput.addEventListener('input', (e: Event) => {
@@ -28,6 +30,7 @@ gotoInput.addEventListener('input', (e: Event) => {
   const value = currentValue === '' ? 0 : parseInt(currentValue, 10)
   if (isNaN(value) || value < 0) return
   ui.goto(BigInt(value) as CheckboxNo)
+  window.location.hash = currentValue
 })
 
 document.addEventListener('keypress', (event) => {
@@ -39,7 +42,20 @@ document.addEventListener('keypress', (event) => {
   gotoInput.dispatchEvent(inputEvent)
 })
 
-window.onload = ui.updatePresentation
+function hashChange() {
+  const href = window.location.href
+  const hash = href.split('#')[1]
+  if (hash) {
+    gotoInput.value = hash
+    ui.goto(BigInt(hash) as CheckboxNo)
+  }
+}
+
+window.onload = () => {
+  ui.updatePresentation()
+  hashChange()
+}
+window.addEventListener('hashchange', hashChange)
 
 smallerButton.addEventListener('click', () => {
   smallerButton.disabled = ui.makeSmaller()
