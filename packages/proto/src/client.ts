@@ -27,10 +27,14 @@ export const createClient = (url: string) => {
     }
   }
 
+  let reconnectTimer: Timer | undefined = undefined
+
   function scheduleReconnect() {
+    if (reconnectTimer) return
     const timeout = 10000
     console.log(`Attempting to reconnect in ${timeout / 1000} seconds...`)
-    setTimeout(() => {
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = undefined
       console.log('Reconnecting...')
       initWebSocket()
     }, timeout)

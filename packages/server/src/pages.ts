@@ -19,7 +19,8 @@ function createServer(port: number) {
       }
       try {
         const url = new URL(req.url)
-        if (!url.pathname.startsWith(prefix)) return new Response('Not found', { status: 404 })
+        if (!url.pathname.startsWith(prefix))
+          return new Response('Not found', { status: 404, headers: cors })
         const pageId = url.pathname.slice(prefixLength)
         const pageCode = pageId.split('-')
         const page = Number(pageCode[0]) as PageNo
