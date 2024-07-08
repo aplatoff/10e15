@@ -31,7 +31,7 @@ export function setupUI(
   timeDiv: HTMLElement,
   onRowChange?: (firstCheckbox: CheckboxNo) => void
 ): UI {
-  let cellSize = maxCellSize
+  let cellSize = maxCellSize >>> 1
   let firstCheckbox = 0n as CheckboxNo
   let lastKnownTime = 0n as Time
   let presentation: Presentation | null = null
