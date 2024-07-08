@@ -86,9 +86,11 @@
 
       .links {
         display: flex;
-        align-items: center;
+        align-items: baseline;
         justify-content: space-between;
         font-size: 11px;
+        height: 20px;
+        gap: 16px;
       }
 
       .links a {
@@ -107,22 +109,12 @@
         justify-content: center;
       }
 
-      .github {
-        display: flex;
-        align-items: center;
-        gap: 4px;
-      }
-
-      /* #canvas-wrapper {
-        width: 100%;
-        height: calc(100vh - 80px);
-        overflow: auto;
-        position: relative;
-        -webkit-overflow-scrolling: touch;
-      } */
-
       canvas {
         position: absolute;
+      }
+
+      .nowrap {
+        white-space: nowrap;
       }
 
       .footer {
@@ -149,12 +141,20 @@
           </div>
         </div>
         <div class="links">
-          <div class="github">
-            <img src="src/assets/github.svg" alt="GitHub Logo" />
-            <p>GitHub</p>
+          <div class="nowrap">
+            <img
+              src="src/assets/github.svg"
+              alt="GitHub Logo"
+              style="position: relative; top: 1px"
+            />
+            GitHub
             <a href="https://github.com/aplatoff/10e15">aplatoff/10e15</a>
           </div>
-          <div class="huly">
+          <div>
+            The number of checkboxes on this page is <b>100 times</b> greater than the entire
+            <b>population of the world</b>.
+          </div>
+          <div class="nowrap">
             Made with
             <a href="https://huly.io"
               ><span><img src="src/assets/huly-logo.svg" alt="Huly Logo" /></span>Huly</a
