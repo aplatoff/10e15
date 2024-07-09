@@ -13,7 +13,7 @@ const db = createDb((time?: Time) => ui.scheduleDraw(time))
 const gotoInput = document.getElementById('goto') as HTMLInputElement
 const c50 = document.getElementById('c50') as HTMLButtonElement
 const c100 = document.getElementById('c100') as HTMLButtonElement
-const c250 = document.getElementById('c250') as HTMLButtonElement
+const c200 = document.getElementById('c200') as HTMLButtonElement
 const smallerButton = document.getElementById('smaller') as HTMLButtonElement
 const largerButton = document.getElementById('larger') as HTMLButtonElement
 
@@ -71,7 +71,7 @@ function changeCols(n: number) {
 
 c50.addEventListener('click', () => changeCols(50))
 c100.addEventListener('click', () => changeCols(100))
-c250.addEventListener('click', () => changeCols(250))
+c200.addEventListener('click', () => changeCols(200))
 
 smallerButton.addEventListener('click', () => {
   smallerButton.disabled = ui.makeSmaller()
