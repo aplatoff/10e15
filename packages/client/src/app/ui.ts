@@ -14,7 +14,8 @@ interface Presentation {
   draw(): void
   scroll(pixels: number): void
   alignScroll(): void
-  click(x: number, y: number): void
+  getCheckbox(x: number, y: number): CheckboxNo | undefined
+  toggle(no: CheckboxNo): void
 }
 
 export interface UI {
@@ -55,14 +56,29 @@ export function setupUI(
     scheduleDraw()
   }
 
-  canvas.addEventListener('click', (event) => {
-    event.preventDefault()
+  let line: CheckboxNo[] | undefined
+
+  function mouseDraw(event: MouseEvent) {
+    if (!presentation || !line) return
     const rect = canvas.getBoundingClientRect()
     const x = event.clientX - rect.left
     const y = event.clientY - rect.top
+    const no = presentation.getCheckbox(x, y)
+    if (no && line.indexOf(no) < 0) {
+      line.push(no)
+      presentation.toggle(no)
+    }
+  }
 
-    presentation?.click(x, y)
-    return false
+  canvas.addEventListener('mousedown', (event) => {
+    line = []
+    // event.preventDefault()
+    mouseDraw(event)
+    // return false
+  })
+  canvas.addEventListener('mousemove', mouseDraw)
+  canvas.addEventListener('mouseup', () => {
+    line = undefined
   })
 
   canvas.addEventListener(
@@ -264,7 +280,8 @@ export function setupUI(
         offsetPixels = 0
       },
 
-      click(x: number, y: number) {
+      getCheckbox(x: number, y: number): CheckboxNo | undefined {
+        console.log('getCheckbox', x, y)
         x *= dpr
         y *= dpr
         const cx = ((x - leftOffset) / cellSize) | 0
@@ -273,9 +290,13 @@ export function setupUI(
         if (cx < cols && cx >= 0) {
           const firstRow = firstCheckbox / nCols
           const no = ((firstRow + BigInt(cy)) * nCols + BigInt(cx)) as CheckboxNo
-          const checkbox = extractNo(no)
-          db.toggle(checkbox)
+          console.log('no', no)
+          return no
         }
+      },
+      toggle(no: CheckboxNo) {
+        console.log('toggle', no)
+        db.toggle(extractNo(no))
       },
     }
   }
