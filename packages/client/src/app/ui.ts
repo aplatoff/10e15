@@ -6,8 +6,9 @@ import { type Db } from './db'
 const numberFormat = new Intl.NumberFormat(navigator.language)
 const dpr = window.devicePixelRatio || 1
 
-const maxCellSize = 32
-const minFontSize = 8
+// const maxCellSize = 32
+// const minCellSize = 4
+// const minFontSize = 8
 
 interface Presentation {
   draw(): void
@@ -17,6 +18,7 @@ interface Presentation {
 }
 
 export interface UI {
+  changeCols(cols: number): void
   makeLarger(): boolean
   makeSmaller(): boolean
   goto(no: CheckboxNo): void
@@ -31,7 +33,7 @@ export function setupUI(
   timeDiv: HTMLElement,
   onRowChange?: (firstCheckbox: CheckboxNo) => void
 ): UI {
-  let cellSize = maxCellSize >>> 1
+  let cols = 100
   let firstCheckbox = 0n as CheckboxNo
   let lastKnownTime = 0n as Time
   let presentation: Presentation | null = null
@@ -136,38 +138,55 @@ export function setupUI(
     updatePresentation()
   })
 
-  function createPresentation(): Presentation {
-    const width = wrapper.clientWidth
-    const height = wrapper.clientHeight
+  const colsResevedForRowNumber = 8
 
-    canvas.width = width * dpr
-    canvas.height = height * dpr
-    canvas.style.width = width + 'px'
-    canvas.style.height = height + 'px'
+  function createPresentation(): Presentation {
+    const bWidth = wrapper.clientWidth
+    const bHeight = wrapper.clientHeight
+
+    const width = bWidth * dpr
+    const height = bHeight * dpr
+
+    canvas.width = width
+    canvas.height = height
+    canvas.style.width = bWidth + 'px'
+    canvas.style.height = bHeight + 'px'
 
     const ctx = canvas.getContext('2d')!
-    ctx.scale(dpr, dpr)
 
-    const fontSize = Math.max(8, cellSize >>> 1)
+    let cellSize = width / (cols + 2)
+    let leftOffset = 0
+
+    const isSmallCell = cellSize < 12 * dpr
+    if (isSmallCell) {
+      cellSize |= 0
+      leftOffset = colsResevedForRowNumber * 2 * cellSize
+      const workArea = width - leftOffset
+      cellSize = (workArea / (cols + 2)) | 0
+    } else {
+      leftOffset = colsResevedForRowNumber * cellSize
+    }
+
+    console.log('cellSize', cellSize, 'cols', cols)
+
+    const fontSize = isSmallCell ? cellSize : cellSize / 2
     ctx.font = `${fontSize.toString()}px JetBrains Mono`
     ctx.textAlign = 'right'
 
-    const leftOffset = Math.max(16, cellSize) * 8
-    const cols = Math.floor((width - leftOffset) / cellSize)
     const nCols = BigInt(cols)
     const rows = Math.ceil(height / cellSize)
 
     let offsetPixels = 0 // vertical offset in pixels for smooth scrolling
 
-    const checkboxFunction = cellSize <= 8 ? smallCheckbox : bigCheckbox
+    const checkboxFunction = isSmallCell ? smallCheckbox : bigCheckbox
 
-    function eachRow(f: (firstCheckBoxInRow: CheckboxNo, row: number) => void) {
+    function eachRow(f: (firstCheckBoxInRow: CheckboxNo, row: number, absolute: bigint) => void) {
       const firstRow = Number(firstCheckbox / nCols)
       for (let r = firstRow === 0 ? 0 : -1; r < rows; r++) {
-        const row = firstRow + r
-        const rowStart = (BigInt(row) * nCols) as CheckboxNo
+        const row = BigInt(firstRow + r)
+        const rowStart = (row * nCols) as CheckboxNo
         if (rowStart >= TotalCheckboxes) break
-        f(rowStart, r)
+        f(rowStart, r, row)
       }
     }
 
@@ -176,7 +195,7 @@ export function setupUI(
       eachRow((rowStart, r) => {
         ctx.fillText(
           numberFormat.format(rowStart),
-          leftOffset - 16,
+          leftOffset - cellSize / 2,
           r * cellSize + (cellSize / 16) * 11
         )
       })
@@ -184,18 +203,19 @@ export function setupUI(
 
     function smallNumbers(ctx: CanvasRenderingContext2D) {
       ctx.fillStyle = 'black'
-      const firstRow = Number(firstCheckbox / nCols)
-      const textRows = Math.floor(height / minFontSize)
-      const rowsPerText = minFontSize / cellSize
-      for (let r = 0; r < textRows; r++) {
-        const row = firstRow + r * rowsPerText
-        const firstCheckbox = row * cols
-        if (firstCheckbox >= TotalCheckboxes) break
-        ctx.fillText(numberFormat.format(firstCheckbox), leftOffset - 16, r * 8 + 8)
-      }
+      eachRow((rowStart, r, abs) => {
+        if (abs % 2n === 0n) {
+          const rowSize = cellSize * 2
+          ctx.fillText(
+            numberFormat.format(rowStart),
+            leftOffset - rowSize / 2,
+            (r / 2) * rowSize + (rowSize / 16) * 11
+          )
+        }
+      })
     }
 
-    const textFunction = cellSize <= 8 ? smallNumbers : bigNumbers
+    const textFunction = isSmallCell ? smallNumbers : bigNumbers
 
     return {
       draw() {
@@ -245,8 +265,10 @@ export function setupUI(
       },
 
       click(x: number, y: number) {
-        const cx = Math.floor((x - leftOffset) / cellSize)
-        const cy = Math.floor((y + offsetPixels) / cellSize)
+        x *= dpr
+        y *= dpr
+        const cx = ((x - leftOffset) / cellSize) | 0
+        const cy = ((y + offsetPixels) / cellSize) | 0
 
         if (cx < cols && cx >= 0) {
           const firstRow = firstCheckbox / nCols
@@ -258,18 +280,17 @@ export function setupUI(
     }
   }
 
-  return {
-    makeLarger() {
-      cellSize <<= 1
-      updatePresentation()
-      return cellSize === maxCellSize
-    },
+  function changeCols(newCols: number) {
+    console.log('changeCols', newCols)
+    cols = newCols
+    updatePresentation()
+    return cols
+  }
 
-    makeSmaller() {
-      cellSize >>= 1
-      updatePresentation()
-      return cellSize === 4
-    },
+  return {
+    changeCols,
+    makeLarger: () => changeCols((cols / 1.1) | 0) < 35,
+    makeSmaller: () => changeCols((cols * 1.1) | 0) > 300,
 
     goto(no: CheckboxNo) {
       firstCheckbox = no >= TotalCheckboxes ? LastCheckbox : no
@@ -288,31 +309,39 @@ function bigCheckbox(
   cellSize: number,
   checked: boolean
 ) {
-  const s12 = cellSize / 2
-  const s14 = cellSize / 4
-  const s34 = s12 + s14
+  const width = cellSize / 2
+  const x14 = x + cellSize / 4
+  const y14 = y + cellSize / 4
+  const x12 = x + cellSize / 2
+  const y12 = y + cellSize / 2
+  const x34 = x + (cellSize * 3) / 4
+  const y34 = y + (cellSize * 3) / 4
 
   if (checked) {
     ctx.fillStyle = '#f60'
-    ctx.fillRect(x + s14, y + s14, s12, s12)
+    ctx.fillRect(x14, y14, width, width)
   }
 
-  const lineWidth = cellSize / 10
+  ctx.fillStyle = '#f60'
   ctx.strokeStyle = 'black'
-  ctx.lineWidth = lineWidth / 2
+  const lineWidth = cellSize / 20
+  ctx.lineWidth = lineWidth
 
   ctx.beginPath()
-  ctx.roundRect(x + s14, y + s14, s12, s12, [lineWidth])
+  ctx.roundRect(x14, y14, width, width, [lineWidth])
   ctx.stroke()
 
   if (checked) {
+    const lineWidth = cellSize / 15
+    const offsetX = lineWidth * 1.5
+    const offsetY = lineWidth * 2
     ctx.lineWidth = lineWidth
     ctx.lineJoin = 'round'
 
     ctx.beginPath()
-    ctx.moveTo(x + s14 + lineWidth, y + s12)
-    ctx.lineTo(x + s12, y + s34 - lineWidth)
-    ctx.lineTo(x + s34 - lineWidth, y + s14 + lineWidth)
+    ctx.moveTo(x14 + offsetX, y12)
+    ctx.lineTo(x12, y34 - offsetY)
+    ctx.lineTo(x34 - offsetX, y14 + offsetY)
     ctx.stroke()
   }
 }
@@ -324,18 +353,19 @@ function smallCheckbox(
   cellSize: number,
   checked: boolean
 ) {
-  const s12 = cellSize / 2
-  const s14 = cellSize / 4
+  const width = (cellSize * 1) / 2
+  const x18 = x + cellSize / 4
+  const y18 = y + cellSize / 4
 
-  ctx.lineWidth = cellSize / 8
-
+  ctx.lineWidth = cellSize / 20
   if (checked) {
-    ctx.fillStyle = 'black'
+    ctx.fillStyle = '#f60'
     ctx.strokeStyle = 'black'
-    ctx.fillRect(x + s14, y + s14, s12, s12)
-    ctx.strokeRect(x + s14, y + s14, s12, s12)
   } else {
+    ctx.fillStyle = '#f8f8f8'
     ctx.strokeStyle = '#ccc'
-    ctx.strokeRect(x + s14, y + s14, s12, s12)
   }
+
+  ctx.fillRect(x18, y18, width, width)
+  ctx.strokeRect(x18, y18, width, width)
 }

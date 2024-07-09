@@ -11,6 +11,9 @@ const db = createDb((time?: Time) => ui.scheduleDraw(time))
 // UI setup
 
 const gotoInput = document.getElementById('goto') as HTMLInputElement
+const c50 = document.getElementById('c50') as HTMLButtonElement
+const c100 = document.getElementById('c100') as HTMLButtonElement
+const c250 = document.getElementById('c250') as HTMLButtonElement
 const smallerButton = document.getElementById('smaller') as HTMLButtonElement
 const largerButton = document.getElementById('larger') as HTMLButtonElement
 
@@ -56,6 +59,16 @@ window.onload = () => {
   hashChange()
 }
 window.addEventListener('hashchange', hashChange)
+
+function changeCols(n: number) {
+  ui.changeCols(n)
+  smallerButton.disabled = false
+  largerButton.disabled = false
+}
+
+c50.addEventListener('click', () => changeCols(50))
+c100.addEventListener('click', () => changeCols(100))
+c250.addEventListener('click', () => changeCols(250))
 
 smallerButton.addEventListener('click', () => {
   smallerButton.disabled = ui.makeSmaller()
