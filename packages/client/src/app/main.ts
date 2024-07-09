@@ -22,10 +22,10 @@ const canvas = document.getElementById('checkboxes') as HTMLCanvasElement
 
 const time = document.getElementById('time') as HTMLElement
 
-const ui = setupUI(db, wrapper, canvas, time, (firstCheckbox) => {
+const ui = setupUI(db, wrapper, canvas, time, (firstCheckbox, cols) => {
   const str = firstCheckbox.toString()
   gotoInput.value = str
-  window.location.hash = str
+  window.location.hash = `${str}-${cols}`
 })
 
 gotoInput.addEventListener('input', (e: Event) => {
@@ -47,10 +47,13 @@ document.addEventListener('keypress', (event) => {
 
 function hashChange() {
   const href = window.location.href
-  const hash = href.split('#')[1]
-  if (hash) {
+  const presentation = href.split('#')[1]
+  if (presentation) {
+    const [hash, colsStr] = presentation.split('-')
     gotoInput.value = hash
     ui.goto(BigInt(hash) as CheckboxNo)
+    const cols = parseInt(colsStr, 10)
+    ui.changeCols(cols > 30 && cols < 400 ? cols : 100)
   }
 }
 

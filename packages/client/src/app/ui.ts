@@ -31,7 +31,7 @@ export function setupUI(
   wrapper: HTMLElement,
   canvas: HTMLCanvasElement,
   timeDiv: HTMLElement,
-  onRowChange?: (firstCheckbox: CheckboxNo) => void
+  onRowChange?: (firstCheckbox: CheckboxNo, cols: number) => void
 ): UI {
   let cols = 100
   let firstCheckbox = 0n as CheckboxNo
@@ -252,7 +252,7 @@ export function setupUI(
         if (rowDelta !== 0) {
           firstCheckbox = (firstCheckbox + BigInt(sign * rowDelta * cols)) as CheckboxNo
           if (firstCheckbox < 0) firstCheckbox = 0n as CheckboxNo
-          onRowChange?.(firstCheckbox)
+          onRowChange?.(firstCheckbox, cols)
         }
         offsetPixels = sign * (Math.abs(offsetPixels) % cellSize)
         if (firstCheckbox === 0n && offsetPixels <= 0) {
@@ -284,6 +284,7 @@ export function setupUI(
     console.log('changeCols', newCols)
     cols = newCols
     updatePresentation()
+    onRowChange?.(firstCheckbox, cols)
     return cols
   }
 
