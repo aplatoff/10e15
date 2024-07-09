@@ -127,7 +127,7 @@ export function setupUI(
       // let deltaX = event.touches[0].clientX - lastTouchX
       let deltaY = lastTouchY - event.touches[0].clientY
 
-      presentation?.scroll(deltaY)
+      presentation?.scroll(deltaY * dpr)
       scheduleDraw()
 
       // lastTouchX = event.touches[0].clientX
