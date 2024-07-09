@@ -60,21 +60,29 @@ export function setupUI(
 
   function mouseDraw(event: MouseEvent) {
     if (!presentation || !line) return
-    const rect = canvas.getBoundingClientRect()
-    const x = event.clientX - rect.left
-    const y = event.clientY - rect.top
-    const no = presentation.getCheckbox(x, y)
+    const c = xy(event)
+    const no = presentation.getCheckbox(c[0], c[1])
     if (no && line.indexOf(no) < 0) {
       line.push(no)
       presentation.toggle(no)
     }
   }
 
+  function xy(event: MouseEvent): [number, number] {
+    const rect = canvas.getBoundingClientRect()
+    return [event.clientX - rect.left, event.clientY - rect.top]
+  }
+
+  function click(coord: [number, number]) {
+    if (!presentation) return
+    const checkbox = presentation?.getCheckbox(coord[0], coord[1])
+    if (checkbox) presentation.toggle(checkbox)
+  }
+
   canvas.addEventListener('mousedown', (event) => {
-    line = []
-    // event.preventDefault()
-    mouseDraw(event)
-    // return false
+    click(xy(event))
+    // line = []
+    // mouseDraw(event)
   })
   canvas.addEventListener('mousemove', mouseDraw)
   canvas.addEventListener('mouseup', () => {
