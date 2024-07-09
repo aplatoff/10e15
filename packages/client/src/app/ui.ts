@@ -127,7 +127,7 @@ export function setupUI(
       // let deltaX = event.touches[0].clientX - lastTouchX
       let deltaY = lastTouchY - event.touches[0].clientY
 
-      presentation?.scroll(deltaY * dpr)
+      presentation?.scroll(deltaY)
       scheduleDraw()
 
       // lastTouchX = event.touches[0].clientX
@@ -270,6 +270,7 @@ export function setupUI(
       },
 
       scroll(pixels: number) {
+        pixels *= dpr
         offsetPixels += pixels
         const sign = Math.sign(offsetPixels)
         const rowDelta = Math.floor(Math.abs(offsetPixels) / cellSize)
