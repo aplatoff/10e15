@@ -76,7 +76,7 @@ export function setupUI(
   function click(coord: [number, number]) {
     if (!presentation) return
     const checkbox = presentation?.getCheckbox(coord[0], coord[1])
-    if (checkbox) presentation.toggle(checkbox)
+    if (checkbox !== undefined) presentation.toggle(checkbox)
   }
 
   canvas.addEventListener('mousedown', (event) => {
